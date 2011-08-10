@@ -1,0 +1,25 @@
+useDynLib(cplm)
+
+############################
+#  import 
+############################
+
+importFrom(stats,  predict, coef, vcov,
+              residuals, resid, fitted, fitted.values)
+importFrom(methods, show)
+#importFrom(graphics, plot)
+importFrom(Matrix, summary)
+
+
+############################
+#  import 
+############################
+# function 
+export(cpglm)
+
+#Classes
+exportClasses(cpglm, NullNum, NullList)
+           
+#Methods
+exportMethods(summary, show,  "$", "[[",  names, coef, vcov, 
+              residuals, resid, fitted, fitted.values)

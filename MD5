@@ -1,0 +1,15 @@
+12f43b49106acdb19fed37e88be36e93 *DESCRIPTION
+dce535f3990d53f5e9495605d0c61d2f *NAMESPACE
+d6f7baed9e74b87ff284dd4c020c31dd *R/classMethods.R
+044b522fee5075ce77f9b500917a6874 *R/cpglm.R
+a0605f8d78fd689bd9fd24d37db53010 *data/fineroot.RData
+b594bcead5d8be1a4c7f4c13d8057149 *man/NullNum-class.Rd
+d78115d595dbb4a0d1e1eb3d6ff2067e *man/cpglm-class.Rd
+ce7f4cb11945866e6a7b251d89bef463 *man/cpglm.Rd
+e0d9242ced857b3700028b4b4e487b61 *man/cplm-package.Rd
+b6dc204dc7c687c586de56e92d6ee079 *man/fineroot.Rd
+64f787517f68cdaa4c09cf17260cabd4 *src/hessGlm.c
+da9c915c02a6181a1ad5e391b82d6e5a *src/optimNbGlm.c
+5edc657f6ddc7c5a437ca304cef959ea *src/sampleTRej.c
+d6dbc32dbd91ec95c524e148b683fa09 *src/utilities.c
+e7f9cb74cf9a0bc73024a1a5aeb87049 *src/utilities.h
