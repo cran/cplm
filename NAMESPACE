@@ -4,8 +4,9 @@ useDynLib(cplm)
 #  import 
 ############################
 
-importFrom(stats,  predict, coef, vcov,
-              residuals, resid, fitted, fitted.values)
+importFrom(stats,  predict, coef, vcov, residuals, resid, 
+		fitted, fitted.values, df.residual, AIC, deviance,
+		terms, formula, model.matrix)
 importFrom(methods, show)
 #importFrom(graphics, plot)
 importFrom(Matrix, summary)
@@ -16,10 +17,13 @@ importFrom(Matrix, summary)
 ############################
 # function 
 export(cpglm)
+export(cpglm_em)
+export(cpglm_profile)
 
 #Classes
-exportClasses(cpglm, NullNum, NullList)
+exportClasses(cpglm, NullNum, NullList, NullFunc)
            
 #Methods
-exportMethods(summary, show,  "$", "[[",  names, coef, vcov, 
-              residuals, resid, fitted, fitted.values)
+exportMethods(summary, show,  "$", "[[", "[", names, coef, vcov, 
+              residuals, resid, fitted, fitted.values, df.residual,
+		  AIC, deviance, terms, formula, model.matrix)

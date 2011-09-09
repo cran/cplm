@@ -15,8 +15,8 @@
 \tabular{ll}{
 Package: \tab cplm\cr
 Type: \tab Package\cr
-Version: \tab 0.1-1\cr
-Date: \tab 2011-08-10\cr
+Version: \tab 0.1-2\cr
+Date: \tab 2011-09-09\cr
 License: \tab GPL version 2 or later\cr
 }
 }
@@ -24,9 +24,12 @@ License: \tab GPL version 2 or later\cr
 Wayne Zhang <actuary_zhang@hotmail.com>
 }
 \references{
-\cite{Zhang Y. (2011). A Latent Variable Approach for Statistical Inference  in Tweedie Compound Poisson Linear Models, \emph{preprint}, \url{http://actuaryzhang.com/publication/bayesianTweedie.pdf}}
-
 \cite{ Dunn, P.K. and Smyth, G.K. (2005). Series evaluation of Tweedie exponential dispersion models densities. \emph{Statistics and Computing}, 15, 267-280.}
+
+\cite{McCulloch, C. E. (1997). Maximum likelihood algorithms for generalized linear mixed
+models. \emph{Journal of the American Statistical Association}, 92, 162-170.}
+
+\cite{Zhang Y. (2011). A Latent Variable Approach for Statistical Inference  in Tweedie Compound Poisson Linear Models, \emph{preprint}, \url{http://actuaryzhang.com/publication/bayesianTweedie.pdf}}
 
 }
 

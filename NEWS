@@ -1,0 +1,24 @@
+Version 0.1-2
+================
+NEW FEATURES
+
+   o Add a wrapper of the profile likelihood approach to the "cpglm" 
+     function that runs automatically to generate estimate of the 
+     index parameter to arbitrary accuracy.
+
+CHANGES:
+
+   o The MCEM algorithm is now implemented in pure C code
+   o Remove the restrict on the "weights" argument (but not tested)
+   o Add "beta.step" in "control" to allow skips in the update of beta
+   o Allow "link" to be both character and numeric
+   o Force coercion of argument type before callings the C function
+ 	- thanks Mikel Esnaola Acebes for pointing out this bug
+   o Re-write "summary" and "show" function to produce statistical
+	test output automatically
+   o Revise "residuals" to allow different types of residuals to be computed
+   o Add methods for "formula", "AIC", "deviance", "model.matrix", "terms"
+   o Output now returns "deviance", "aic" and "model.frame"
+   o Tracing info from MCEM tidied up by showing only the dispersion, the
+	index parameter, and the sample size (if necessary)
+   o Fix bug in the definition of "[[", add methods for "["
