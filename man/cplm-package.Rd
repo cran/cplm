@@ -9,15 +9,14 @@
    
   More information is available
   on the project web site \url{http://code.google.com/p/cplm/}
-}
- 
+} 
 \details{
 \tabular{ll}{
 Package: \tab cplm\cr
 Type: \tab Package\cr
-Version: \tab 0.1-2\cr
-Date: \tab 2011-09-09\cr
-License: \tab GPL version 2 or later\cr
+Version: \tab 0.2-1\cr
+Date: \tab 2011-09-15\cr
+License: \tab GPL version 2 or later
 }
 }
 \author{

@@ -1,4 +1,4 @@
-\name{cpglm-class}
+\name{cpglm-class-method}
 \docType{class}
 \alias{cpglm-class}
 \alias{$,cpglm-method}
@@ -33,7 +33,6 @@ Objects can be created by calls of the form \code{new("cpglm", ...)}, or they co
 \section{Slots}{
 The function \code{cpglm} is a variant of the generalized linear model that allows the estimation of the index parameter from the data, and thus most of the slots in the result have the same definition as those in \code{\link{glm}}. But for the Monte Carlo EM algorithm (\code{method="MCEM"}), some of these slots have different meanings:
 \describe{
-    \item{\code{.Data}:}{Object of class \code{"list"}.}
     \item{\code{coefficients}:}{Object of class \code{"numeric"}, estimated mean parameters. }
     \item{\code{residuals}:}{Object of class \code{"numeric"}, the working residuals, that is the residuals in the final iteration of the IWLS fit.}
     \item{\code{fitted.values}:}{Object of class \code{"numeric"}, the fitted mean values, obtained by transforming the linear predictors by the inverse of the link function. }
@@ -64,11 +63,6 @@ The function \code{cpglm} is a variant of the generalized linear model that allo
   }
 }
 
-\section{Extends}{
-Class \code{"\linkS4class{list}"}, from data part.
-Class \code{"\linkS4class{vector}"}, by class "list", distance 2.
-Class \code{"\linkS4class{NullList}"}, by class "list", distance 2.
-}
 
 \section{Methods}{
   \describe{

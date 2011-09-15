@@ -3,11 +3,15 @@
 # classes defined in the cplm package
 ################################################
 
+# virtual classes used in other class definitions
 setClassUnion("NullNum",c("NULL","numeric"))
 setClassUnion("NullList",c("NULL","list"))  
 setClassUnion("NullFunc",c("NULL","function"))
 
-# class of "cpglm" 
+# import from package coda
+setOldClass(c("mcmc","mcmc.list","summary.mcmc"))
+
+# class of "cpglm", returned by a call to "cpglm" 
 setClass("cpglm", 
  representation(
   coefficients="numeric",
@@ -36,9 +40,30 @@ setClass("cpglm",
   y="numeric",
   link.power="numeric",
   na.action="NullFunc",
-  model.frame="data.frame"),         
- contains="list" 
+  model.frame="data.frame")
 )
+
+# class of "bcplm", base class used in all Bayesian models 
+setClass("bcplm", 
+ representation( 
+  n.chains="integer", 
+  n.iter="integer", 
+  n.burnin="integer",
+  n.thin="integer", 
+  n.sims="integer", 
+  sims.list="mcmc.list",
+  summary="summary.mcmc",
+  link.power="numeric",
+  model.frame = "data.frame",
+  call="call",
+  formula="formula",
+  data="data.frame",
+  contrasts="NullList",
+  inits="list")
+)             
+
+# class of "bcpglm", returned from a call to "bcpglm"
+setClass("bcpglm", contains="bcplm")             
 
 ################################################
 # methods defined for cpglm
@@ -108,7 +133,6 @@ setMethod("coef",
     }
 )
 
-# variance-covariance matrix as returned by systemfit.
 setMethod("vcov",
 	signature(object = "cpglm"),
     function (object,...) 
@@ -116,7 +140,6 @@ setMethod("vcov",
 	return(object@vcov)
     }
 )
-
 
 setMethod("residuals",
     signature(object = "cpglm"),
@@ -296,3 +319,108 @@ setMethod("show",signature(object = "cpglm"),
 )     
 
 
+
+################################################
+# methods defined for bcplm
+################################################
+
+# extraction of slots using $
+setMethod("$",
+    signature(x = "bcplm"),
+    function (x, name) 
+    {
+        slot(x,name)
+    }
+)
+
+# names to get slot names
+setMethod("names",
+    signature(x = "bcplm"),
+    function (x) 
+    {
+        return(slotNames(x))
+    }
+)
+
+# extraction of slots using "[["
+setMethod("[[",
+    signature(x = "bcplm",i="numeric",j="missing"),
+    function (x, i, j, ...) 
+    {
+    return(slot(x,names(x)[i]))
+    }
+)
+
+setMethod("[[",
+    signature(x = "bcplm",i="character",j="missing"),
+    function (x, i, j, ...) 
+    {
+      return(slot(x,i))
+    }
+)
+
+setMethod("[",
+    signature(x = "bcplm",i="numeric",j="missing",drop="missing"),
+    function (x, i, j, ..., drop) 
+    {
+  output <- lapply(i, function(y) slot(x,names(x)[y]))
+        names(output) <- names(x)[i]
+	return(output)
+    }
+)
+
+setMethod("[",
+    signature(x = "bcplm",i="character",j="missing",drop="missing"),
+    function (x, i, j, ..., drop) 
+    {
+      output <- lapply(1:length(i), function(y) slot(x,i[y]))
+      names(output) <- i
+      return(output)
+    }
+)
+
+setMethod("terms",
+    signature(x = "bcplm"),
+    function (x,...) 
+    {
+      attr(x@model.frame,"terms")
+    }
+)
+
+setMethod("model.matrix",
+    signature(object = "bcplm"),
+    function (object,...) 
+    {
+    model.matrix(terms(object), 
+            object@model.frame, object@contrasts)
+    }
+)
+
+setMethod("formula",
+    signature(x = "bcplm"),
+    function (x,...) 
+    {
+    x@formula
+    }
+)
+
+
+setMethod("summary", signature(object="bcplm"),
+  function(object, quantiles = c(0.025, 0.25, 0.5, 0.75, 0.975),...){
+    summary(object@sims.list,quantiles=quantiles)   
+  }
+)
+
+
+setMethod("plot", signature(x="bcplm",y="missing"),
+  function(x,y,...){
+    plot(x@sims.list)
+  }
+)
+
+
+setMethod("show",signature(object = "bcplm"),
+  function(object){
+    summary(object)                                                    
+  }
+)

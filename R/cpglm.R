@@ -58,8 +58,8 @@ cpglm <- function(formula, link = "log", data, weights, offset,
                      intercept=attr(mt, "intercept") > 0L,control=control)
   if (method=="profile")    
     cpfit <- cpglm_profile(X,Y,weights=weights,offset=offset,
-                     link.power=link.power,contrasts=contrasts,control=control,
-                      intercept=attr(mt, "intercept") > 0L)
+                           link.power=link.power,contrasts=contrasts,control=control,
+                           intercept=attr(mt, "intercept") > 0L)
   
   class(mt) <- "terms"
   ans <- new("cpglm", 
@@ -133,7 +133,7 @@ cpglm_em <- function(X,Y,weights=NULL,offset=NULL,
         phistart <- sum(residuals(fit.start,"pearson")^2)/
           df.residual(fit.start)
     }
-    
+
     out <- .Call("cpglm_em",
                  X=as.double(X),
                  Y=as.double(Y),
@@ -401,45 +401,3 @@ cpglm.control <- function(init.size=100L,
 
 
 
-
-###
-if (FALSE) {
-library(tweedie)
-library(rbenchmark)
-
-options(error = recover)
-#setwd("~/2011/cplm")
-setwd("C:\\Documents and Settings\\CAB2007\\My Documents\\2011\\cplm")
-load("./data/fineroot.RData")
-source("./R/classMethods.R")
-#dyn.load("./src/cplm.so")
-link="log"
-control=list()
-trace=T
-
-
-mf <- match.call(cpglm,call("cpglm",RLD~ factor(Zone)*factor(Stock),
-	data=fineroot,control=list(maxit=150,sample.iter=20),
-      pstart=1.4))
-                    
-dyn.load("./src/cpglm_em.dll")
-dyn.unload("./src/cpglm_em.dll")
-
-# MCEM fit
-set.seed(11)
-fit1 <- cpglm(RLD~ factor(Zone)*factor(Stock),
-	data=fineroot,
-  control=list(init.size=5,sample.iter=60,
-              max.size=3000,fixed.size=FALSE),
-  pstart=1.6)
-
-# profile likelihood         
-fit2 <- cpglm(RLD~ factor(Zone)*factor(Stock),
-	data=fineroot,method="profile", 
-	control=list(decimal=1))      
-
-# compare the two 
-summary(fit1)
-summary(fit2)
-
-}

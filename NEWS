@@ -1,3 +1,34 @@
+================
+Version 0.2-1
+================
+NEW FEATURES
+
+   o The package now implements MCMC methods for Bayesian compound 
+	Poisson GLM in the function "bcpglm" with the use of 
+	latent variables.      
+   o The R package "coda" is imported so that a large number of functions 
+	and methods defined there are now directly applicable to 
+	the simulation results from "bcpglm" to help diagnose convergence
+	and summarize posterior inference. 
+
+CHANGES:
+   (user-visable)	
+   o Various methods defined for the class "bcplm" and "bcpglm"
+   (not user-visable, all in C code):
+   o Change the use of "R_alloc" in "lbfgsb" to "Calloc" and "Free" 
+	(the old function eats up memory quickly)
+   o Simplify rejection sampling of latent variables (now twice faster)
+
+================
+Version 0.1-3 (not released)
+================
+CHANGES (not user-visable, all in C code):
+   o Fix a bug in rejection sampling of the latent variable 
+   o Fix a bug in specifying weights
+   o Divide cpglm_str into three parts, one for data and parameters, 
+	one for latent variable, and one for EM related 
+
+================
 Version 0.1-2
 ================
 NEW FEATURES

@@ -3,7 +3,7 @@
 //       Wayne Zhang
 //
 
-#include "utilities.h"
+#include "cplm.h"
 
 // allocate memory for a double vector of size n
 double * dvect(int n)
@@ -75,6 +75,87 @@ double icumwsum(int *x, double *w, int n){
     return sm ;
 }
 
+
+void lbfgsb2(int n, int m, double *x, double *l, double *u, int *nbd,
+	    double *Fmin, optimfn fminfn, optimgr fmingr, int *fail,
+	    void *ex, double factr, double pgtol,
+	    int *fncount, int *grcount, int maxit, char *msg,
+	    int trace, int nREPORT)
+{
+    char task[60];
+    double f, *g, dsave[29], *wa;
+    int tr = -1, iter = 0, *iwa, isave[44], lsave[4];
+
+    if(n == 0) { /* not handled in setulb */
+	*fncount = 1;
+	*grcount = 0;
+	*Fmin = fminfn(n, u, ex);
+	strcpy(msg, "NOTHING TO DO");
+	*fail = 0;
+	return;
+    }
+    if (nREPORT <= 0)
+	error(("REPORT must be > 0 (method = \"L-BFGS-B\")"));
+    switch(trace) {
+    case 2: tr = 0; break;
+    case 3: tr = nREPORT; break;
+    case 4: tr = 99; break;
+    case 5: tr = 100; break;
+    case 6: tr = 101; break;
+    default: tr = -1; break;
+    }
+
+    *fail = 0;
+    g = Calloc(n, double);
+    /* this needs to be zeroed for snd in mainlb to be zeroed */
+    wa = Calloc(2*m*n+4*n+11*m*m+8*m, double);
+    iwa = Calloc(3*n, int);
+    strcpy(task, "START");
+    while(1) {
+	/* Main workhorse setulb() from ../appl/lbfgsb.c : */
+	setulb(n, m, x, l, u, nbd, &f, g, factr, &pgtol, wa, iwa, task,
+	       tr, lsave, isave, dsave);
+/*	Rprintf("in lbfgsb - %s\n", task);*/
+	if (strncmp(task, "FG", 2) == 0) {
+	    f = fminfn(n, x, ex);
+	    if (!R_FINITE(f))
+		error(("L-BFGS-B needs finite values of 'fn'"));
+	    fmingr(n, x, g, ex);
+	} else if (strncmp(task, "NEW_X", 5) == 0) {
+	    if(trace == 1 && (iter % nREPORT == 0)) {
+		Rprintf("iter %4d value %f\n", iter, f);
+	    }
+	    if (++iter > maxit) {
+		*fail = 1;
+		break;
+	    }
+	} else if (strncmp(task, "WARN", 4) == 0) {
+	    *fail = 51;
+	    break;
+	} else if (strncmp(task, "CONV", 4) == 0) {
+	    break;
+	} else if (strncmp(task, "ERROR", 5) == 0) {
+	    *fail = 52;
+	    break;
+	} else { /* some other condition that is not supposed to happen */
+	    *fail = 52;
+	    break;
+	}
+    }
+    *Fmin = f;
+    *fncount = *grcount = isave[33];
+    if (trace) {
+	Rprintf("final  value %f \n", *Fmin);
+	if (iter < maxit && *fail == 0) Rprintf("converged\n");
+	else Rprintf("stopped after %i iterations\n", iter);
+    }
+    strcpy(msg, task);
+    Free(g) ;
+    Free(wa) ;
+    Free(iwa) ;
+}
+
+
 /*
  wrapper for the univariate lbfgsb function:
  - x, the value of the parameter
@@ -97,14 +178,14 @@ void lbfgsbU(double *x, double lower, double upper, double *val,
     }
 
     // default the parameters needed for lbfgsb 
-    double factr=1e7, pgtol=0 ;
+    double factr=1E7, pgtol=0 ;
     int fncount, grcount;
     int lmm=5, maxit=1000, trace=0, nREPORT=10 ;
     char msg[60] ;
 
-    lbfgsb(1,lmm,x, &lower, &upper, &nbd, val, fn, gr,
+    lbfgsb2(1,lmm, x, &lower, &upper, &nbd, val, fn, gr,
            conv, (void *)ex, factr, pgtol, &fncount, &grcount,
-           maxit,msg ,trace,nREPORT) ;
+           maxit,msg ,trace, nREPORT) ;
 } 
 
 

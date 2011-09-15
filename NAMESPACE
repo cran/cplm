@@ -8,8 +8,9 @@ importFrom(stats,  predict, coef, vcov, residuals, resid,
 		fitted, fitted.values, df.residual, AIC, deviance,
 		terms, formula, model.matrix)
 importFrom(methods, show)
-#importFrom(graphics, plot)
+importFrom(graphics, plot)
 importFrom(Matrix, summary)
+import(coda)
 
 
 ############################
@@ -19,11 +20,13 @@ importFrom(Matrix, summary)
 export(cpglm)
 export(cpglm_em)
 export(cpglm_profile)
+export(bcpglm)
 
 #Classes
-exportClasses(cpglm, NullNum, NullList, NullFunc)
+exportClasses(cpglm, bcplm, bcpglm)
+exportClasses(NullNum, NullList, NullFunc)
            
 #Methods
 exportMethods(summary, show,  "$", "[[", "[", names, coef, vcov, 
               residuals, resid, fitted, fitted.values, df.residual,
-		  AIC, deviance, terms, formula, model.matrix)
+		  AIC, deviance, terms, formula, model.matrix, plot)
