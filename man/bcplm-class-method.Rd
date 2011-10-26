@@ -15,49 +15,48 @@
 \alias{summary,bcplm-method}
 \alias{terms,bcplm-method}
 
-\title{Class "bcplm" of MCMC compound Poisson linear models}
-\description{This class corresponds to the result from a 
-Markov Chain Monte Calo algorithm for the compound Poisson linear models
-defined in this package. It extends class "cpglm" directly. 
+\title{Representaion of a Bayesian compound Poisson Linear Model object}
+\description{Class \code{"bcplm"} is a representation of a Bayesian compound Poisson Linear Model object resulted from implementations of   
+Markov Chain Monte Calo algorithms.  Class \code{"bcpglm"} extends class \code{"bcplm"} directly. 
 
 }
 \section{Objects from the Class}{
-Objects can be created by calls of the form \code{new("bcplm", ...)}.
+Objects of class \code{"bcplm"} can be created by calls of the form \code{new("bcplm", ...)}. Objects of class \code{"bcpglm"} can be created by calls from \code{new("bcplm", ...)} or \code{bcpglm}. 
 }
 
 
 \section{Slots}{
   \describe{
-    \item{\code{n.chains}:}{Object of class \code{"integer"}, number of Markov chains (default: \code{3}).}
-    \item{\code{n.iter}:}{Object of class \code{"integer"}, number of total iterations per chain (including burn in; default: \code{2000}).}
-    \item{\code{n.burnin}:}{Object of class \code{"integer"}, length of burn in, i.e. number of iterations to discard at the beginning. Default is \code{n.iter/2}, that is, discarding the first half of the simulations.}
-    \item{\code{n.thin}:}{Object of class \code{"integer"}, thinning rate. Must be a positive integer. Set \code{n.thin > 1} to save memory and computation time if \code{n.iter} is large. The default value is \code{max(1, floor(n.chains*(n.iter-n.burnin)/1000))} which will only thin if there are at least 2000 simulations.}
-    \item{\code{n.sims}:}{Object of class \code{"integer"}, the approximate number of simulations to keep after thinning.}
+    \item{\code{n.chains}:}{number of Markov chains, class \code{"integer"}}
+    \item{\code{n.iter}:}{number of total iterations per chain, class \code{"integer"}}
+    \item{\code{n.burnin}:}{length of burn in, i.e. number of iterations to discard at the beginning, class \code{"integer"}}
+    \item{\code{n.thin}:}{thinning rate. class \code{"integer"}}
+    \item{\code{n.sims}:}{the approximate number of simulations to keep after thinning, class \code{"integer"}}
     \item{\code{sims.list}:}{Object of class \code{"mcmc.list"}, a list of \code{n.chains} \code{mcmc} objects, each \code{mcmc} object storing the simulation result from a Markov chain. See \code{\link[coda]{mcmc}} and \code{\link[coda]{mcmc.convert}}. Since this is an \code{"mcmc.list"} object, most methods defined in the package \code{coda} can be directly applied to it. }
     \item{\code{summary}:}{Object of class \code{"summary.mcmc"}, two sets of summary statistics for each variable: Mean, standard deviation, naive standard error of the mean (ignoring autocorrelation of the chain) and time-series standard error based on an estimate of the spectral density at 0. See \code{\link[coda]{summary.mcmc}}.}
-    \item{\code{link.power}:}{Object of class \code{"numeric"}, index of power link function. See \code{\link[statmod]{tweedie}}.}
-    \item{\code{model.frame}:}{Object of class \code{"data.frame"}, the data frame used.}
-    \item{\code{call}:}{Object of class \code{"call"}, the matched call. }
-    \item{\code{formula}:}{Object of class \code{"formula"}, the formula supplied. }
-    \item{\code{data}:}{Object of class \code{"data.frame"}, the supplied data.}
-    \item{\code{contrasts}:}{Object of class \code{"NullList"}, the supplied contrasts. }
-    \item{\code{inits}:}{Object of class \code{"list"}, initial values used for each chain. }
+    \item{\code{link.power}:}{index of power link function, class \code{"numeric"}. See \code{\link[statmod]{tweedie}}.}
+    \item{\code{model.frame}:}{the model frame used, class \code{"data.frame"}}
+    \item{\code{call}:}{the matched call, class \code{"call"} }
+    \item{\code{formula}:}{the formula supplied, class \code{"formula"} }
+    \item{\code{data}:}{the supplied data, class \code{"data.frame"}}
+    \item{\code{contrasts}:}{the supplied contrasts, class \code{"NullList"} }
+    \item{\code{inits}:}{initial values used for each chain, class \code{"list"} }
   }
 }
 \section{Methods}{
   \describe{
-    \item{$}{\code{signature(x = "bcplm")}: see \code{\link{cpglm-class}}. }
-    \item{[}{\code{signature(x = "bcplm", i = "character", j = "missing", drop = "missing")}: see \code{\link{cpglm-class}}. }
-    \item{[}{\code{signature(x = "bcplm", i = "numeric", j = "missing", drop = "missing")}: see \code{\link{cpglm-class}}. }
-    \item{[[}{\code{signature(x = "bcplm", i = "character", j = "missing")}: see \code{\link{cpglm-class}}. }
-    \item{[[}{\code{signature(x = "bcplm", i = "numeric", j = "missing")}: see \code{\link{cpglm-class}}. }
-    \item{formula}{\code{signature(x = "bcplm")}: see \code{\link{cpglm-class}}. }
-    \item{model.matrix}{\code{signature(object = "bcplm")}: see \code{\link{cpglm-class}}. }
-    \item{names}{\code{signature(x = "bcplm")}: see \code{\link{cpglm-class}}. }
-    \item{plot}{\code{signature(x = "bcplm", y = "missing")}: see \code{\link[coda]{plot.mcmc}}. }
-     \item{show}{\code{signature(object = "bcplm")}: Method for \code{show}. }
-    \item{summary}{\code{signature(object = "bcplm")}: see \code{\link[coda]{summary.mcmc}}. }
-    \item{terms}{\code{signature(x = "bcplm")}: see \code{\link{cpglm-class}}. }
+    \item{$}{\code{signature(x = "bcplm")}: extract a slot of \code{x} with a specified slot name, see \code{\link{cpglm-class}}. }
+    \item{[}{\code{signature(x = "bcplm", i = "character", j = "missing", drop = "missing")}:  see \code{\link{cpglm-class}}. }
+    \item{[}{\code{signature(x = "bcplm", i = "numeric", j = "missing", drop = "missing")}:  see \code{\link{cpglm-class}}. }
+    \item{[[}{\code{signature(x = "bcplm", i = "character", j = "missing")}: extract the slots with names in \code{i}, see \code{\link{cpglm-class}}. }
+    \item{[[}{\code{signature(x = "bcplm", i = "numeric", j = "missing")}: extract the i-th slot, see \code{\link{cpglm-class}}. }
+    \item{formula}{\code{signature(x = "bcplm")}: extract the formula }
+    \item{model.matrix}{\code{signature(object = "bcplm")}: extract the model matrix }
+    \item{names}{\code{signature(x = "bcplm")}: extract the slot names }
+    \item{plot}{\code{signature(x = "bcplm", y = "missing")}: summarize the \code{"bcplm"} object with a trace of the sampled output and a density estimate for each variable in the chain. See \code{\link[coda]{plot.mcmc}}. }
+     \item{show}{\code{signature(object = "bcplm")}: method for \code{show}. }
+    \item{summary}{\code{signature(object = "bcplm")}:  produce two sets of summary statistics. See \code{\link[coda]{summary.mcmc}}. }
+    \item{terms}{\code{signature(x = "bcplm")}: extract the model terms. }
 	 }
 }
 

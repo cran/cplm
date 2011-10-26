@@ -5,7 +5,7 @@
 \title{
   Tweedie compound Poisson linear models 
 }
-\description{This R package provides methods for fitting Tweedie compound Poisson linear models using the Monte Carlo EM algorithm and Markov Chain Monte Carlo methods. The forms of the models that are handled in the package are generalized linear models, mixed-effect models and their corresponding Bayesian models. For non-Bayesian models, maximum likelihood estimations are obtained for all parameters in the model, especially for the index parameter. Estimation for the Bayesian model is performed by Markov Chain Monte Carlo simulations.
+\description{This R package provides various methods for fitting Tweedie compound Poisson linear models. The forms of the models that are handled in the package are generalized linear models, mixed-effect models and their corresponding Bayesian models. We provide profiled likelihood approaches, Laplacian approximation and Monte Carlo EM algorithms for non-Bayesian models, and Markov Chain Monte Carlo methods for Bayesian models. All methods allow the index parameter to be estimated from the data.
    
   More information is available
   on the project web site \url{http://code.google.com/p/cplm/}
@@ -14,8 +14,8 @@
 \tabular{ll}{
 Package: \tab cplm\cr
 Type: \tab Package\cr
-Version: \tab 0.2-1\cr
-Date: \tab 2011-09-15\cr
+Version: \tab 0.3-1\cr
+Date: \tab 2011-10-26\cr
 License: \tab GPL version 2 or later
 }
 }
@@ -27,8 +27,6 @@ Wayne Zhang <actuary_zhang@hotmail.com>
 
 \cite{McCulloch, C. E. (1997). Maximum likelihood algorithms for generalized linear mixed
 models. \emph{Journal of the American Statistical Association}, 92, 162-170.}
-
-\cite{Zhang Y. (2011). A Latent Variable Approach for Statistical Inference  in Tweedie Compound Poisson Linear Models, \emph{preprint}, \url{http://actuaryzhang.com/publication/bayesianTweedie.pdf}}
 
 }
 

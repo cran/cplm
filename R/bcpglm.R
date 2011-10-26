@@ -8,12 +8,14 @@ bcpglm <- function(formula, link = "log", data, inits = NULL,
                    n.chains=3, n.iter=2000, n.burnin=floor(n.iter/2),
                    n.thin=max(1, floor(n.chains * (n.iter - n.burnin) / n.sims)),
                    n.sims=1000, n.report=1000, prior.beta.mean, prior.beta.var, 
-                   phi.shape=0.001, phi.scale=0.001, bound.p=c(1.01,1.99),...) {
-  
+                   bound.phi=100, bound.p=c(1.01,1.99), method="dtweedie",
+                   tune.iter=4000, n.tune=10, tune.weight=0.25,...) {
+
   call <- match.call()  
   if (missing(data)) 
     data <- environment(formula)   
   mf <- match.call(expand.dots = FALSE)
+  # construct model frame
   m <- match(c("formula", "data", "subset", "weights",
                "na.action", "offset"), names(mf), 0L)
   mf <- mf[c(1L, m)]
@@ -68,26 +70,24 @@ bcpglm <- function(formula, link = "log", data, inits = NULL,
   if (missing(prior.beta.var))
   	prior.beta.var <- rep(10000, n.beta)
   
-	# run MCMC 
-	bfit <- bcpglm_gibbs_lat(X=X,Y=Y,weights=weights,offset=offset,
+  # run MCMC 
+	bfit <- bcpglm_gibbs(X=X,Y=Y,weights=weights,offset=offset,
                       link.power=link.power, inits=inits, 
                       n.chains=n.chains, n.iter=n.iter, 
                       n.burnin=n.burnin, n.sims=n.sims, n.thin=n.thin, 
                       n.report=n.report, prior.beta.mean=prior.beta.mean, 
-                      prior.beta.var=prior.beta.var, phi.shape=phi.shape, 
-                      phi.scale=phi.scale, bound.p=bound.p)
+                      prior.beta.var=prior.beta.var, intercept=attr(mt, "intercept") > 0L,
+                      bound.phi=bound.phi, bound.p=bound.p, n.tune=n.tune,
+                      tune.iter=tune.iter, tune.weight=tune.weight, method=method)
   
   # coerce sims.list to mcmc.list from coda
-  sims <- lapply(bfit$sims.list, as.mcmc)
-  sims <- as.mcmc.list(sims)
   ans <- new("bcpglm", 
              n.chains=as.integer(n.chains), 
              n.iter=as.integer(n.iter), 
              n.burnin=as.integer(n.burnin),
              n.thin=as.integer(n.thin), 
-             n.sims=as.integer(bfit$n.sims), 
-             sims.list=sims,
-             summary = summary(sims),
+             n.sims=as.integer(bfit$dims["n.sims"]), 
+             sims.list=bfit$sims.list,
              link.power=link.power,
              call=call,
              formula=formula,
@@ -101,103 +101,109 @@ bcpglm <- function(formula, link = "log", data, inits = NULL,
 
 
 # function to run the MCMC using latent variables
-bcpglm_gibbs_lat <- function(X,Y,weights=NULL,offset=NULL,
+bcpglm_gibbs <- function(X,Y,weights=NULL,offset=NULL,
                       link.power=0, inits=NULL, n.chains, n.iter, 
                       n.burnin, n.sims, n.thin, n.report,
-                      prior.beta.mean, prior.beta.var, phi.shape=0.001, 
-                      phi.scale=0.001, bound.p=c(1.01,1.99)){
+                      prior.beta.mean, prior.beta.var, 
+                      bound.phi=100, bound.p=c(1.01,1.99),
+                      tune.iter=2000, n.tune=10, tune.weight=0.25,
+                      intercept=T, method="dtweedie"){
 
-    X <- as.matrix(X)          
-    # get names
-    xnames <- dimnames(X)[[2L]]
-    ynames <- if (is.matrix(Y)) 
+  X <- as.matrix(X)          
+  # get names
+  xnames <- dimnames(X)[[2L]]
+  ynames <- if (is.matrix(Y)) 
         rownames(Y) else 
         names(Y)
-    n.beta <- NCOL(X)
-    # default weights and offsets if NULL    
-    nobs <- NROW(Y)
-    if (is.null(weights))     
-      weights <- rep.int(1, nobs)
-    if (is.null(offset)) 
-        offset <- rep.int(0, nobs)   
+  n.beta <- NCOL(X)
+  ygt0 <- as.integer(which(Y>0L))
+  # default weights and offsets if NULL    
+  n.obs <- NROW(Y)
+  if (is.null(weights))     
+      weights <- rep.int(1, n.obs)
+  if (is.null(offset)) 
+        offset <- rep.int(0, n.obs)   
     
-    # generating scale matrix in metropolis update of beta
-    pstart <- if (!is.null(inits))
-    			inits[[1]][n.beta+2] else 
-    			sum(bound.p)/2
-    fit.start <- glm(Y~-1+X,weights=weights,offset=offset,
-                  family=tweedie(var.power=pstart,
-                                 link.power=link.power))
-    ebeta.var <- vcov(fit.start)
+  n.keep <- floor((n.iter-n.burnin) / n.thin)
+  n.sims <- n.chains * n.keep  
+  # dimensions used in simulation
+  dims <- list(n.obs= n.obs,
+           n.beta=n.beta,
+           n.pos= length(ygt0),
+           n.chains=as.integer(n.chains), 
+           n.iter=as.integer(n.iter), 
+           n.burnin=as.integer(n.burnin),
+           n.thin=as.integer(n.thin), 
+           n.keep=as.integer(n.keep),
+           n.sims=as.integer(n.sims),
+           n.report=as.integer(n.report),
+           tune.iter=as.integer(tune.iter),
+           n.tune=as.integer(n.tune))
+  dims <- unlist(dims)
+
+  # generating scale matrix in metropolis update 
+  fit.start <- cpglm_profile(X=X,Y=Y,weights=weights,offset=offset,
+                      link.power=link.power, intercept=intercept)
+                  
+  ebeta.var <- fit.start$vcov*2.38^2/n.beta
+  ephi.var <- 2.38^2 * attr(fit.start$vcov, "phi_p")[1,1]
+  ep.var <- 2.38^2 * attr(fit.start$vcov, "phi_p")[2,2]
     
-    # generate initial values if necessary
-    if (is.null(inits)) {                             
-	      betastart <- as.numeric(fit.start$coefficients)
-    	  phistart <- sum(residuals(fit.start,"pearson")^2)/
-          			  df.residual(fit.start)
-  		  inits.start <- c(betastart, phistart, pstart)
-  		  inits <- vector("list",n.chains)
-  		  cv <- chol(ebeta.var)
-		    inits[[1]] <- c(betastart, phistart, pstart)
-		    if (n.chains>1){
-			    for (i in 2:n.chains)
-				    inits[[i]] <- c(betastart + t(cv)%*%rnorm(n.beta),
-							        runif(1,phistart/2,1.5*phistart),
-							        runif(1,(bound.p[1]+pstart)/2,(bound.p[2]+pstart)/2))
-		    }
-	  }
-    
-    # start MCMC 
-    sims.list <- vector("list",n.chains)
-    n.keep <- floor((n.iter-n.burnin) / n.thin)
-    n.sims <- n.chains * n.keep
-    	if (n.report>0){
-    		cat(paste(rep("-",50), collapse=""))
-    		cat("\n")
-	    	cat("Markov Chain Monte Carlo starts...\n")
-    		cat(paste(rep("-",50), collapse=""))	   
-    		cat("\n") 	
-    	}
-    for (i in 1:n.chains){
-    	if (n.report>1)
-	    	cat("Start Markov chain", i, ":\n")    	
-	    sims.list[[i]] <- .Call("bcpglm_gibbs_lat",
-                 X=as.double(X),
-                 Y=as.double(Y),
-                 ygt0= as.integer(which(Y>0L)),
-                 offset=as.double(offset),
-                 weights=as.double(weights),
-                 beta=as.double(inits[[i]][1:n.beta]),
-                 phi=as.double(inits[[i]][n.beta+1]),
-                 p=as.double(inits[[i]][n.beta+2]),
-                 link.power=as.double(link.power),
-                 pbeta.mean=as.double(prior.beta.mean),
-                 pbeta.var=as.double(prior.beta.var),
-                 pphi.shape =as.double(phi.shape),
-                 pphi.scale =as.double(phi.scale),
-                 bound.p=as.double(bound.p),                 
-                 ebeta.var=as.double(ebeta.var),
-                 n.iter=as.integer(n.iter),
-                 n.burnin=as.integer(n.burnin),
-                 n.thin=as.integer(n.thin),
-                 n.keep=as.integer(n.keep),
-                 n.report=as.integer(n.report))
-     dimnames(sims.list[[i]]) <- list(NULL, c(xnames,"phi","p"))
-     if (n.report>1){
-        cat(paste(rep("-",50), collapse=""))
-        cat("\n")
-      }
-    }
-    if (n.report>0){
-    	cat("End of Markov Chain Monte Carlo simulation.\n")
-    	cat(paste(rep("-",50), collapse=""))	    	
-    	cat("\n")
-    }     
-    out <- list(n.chains=n.chains, n.iter=n.iter, 
-                n.burnin=n.burnin, n.thin=n.thin, 
-                n.sims=n.sims, sims.list=sims.list,
-                inits = inits)
-    return(out)
+  # generate initial values if necessary
+  if (is.null(inits)) {
+      pstart <- fit.start$p
+      betastart <- as.numeric(fit.start$coefficients)
+  	  phistart <- fit.start$phi
+		  inits.start <- c(betastart, phistart, pstart)
+		  inits <- vector("list",n.chains)
+		  cv <- chol(ebeta.var)
+	    inits[[1]] <- c(betastart, phistart, pstart)
+	    if (n.chains>1){
+		    for (i in 2:n.chains)
+			    inits[[i]] <- c(betastart + t(cv)%*%rnorm(n.beta),
+						        runif(1,phistart/2,1.5*phistart),
+						        runif(1,(bound.p[1]+pstart)/2,(bound.p[2]+pstart)/2))
+	    }
+  }
+
+  # run MCMC   
+    # input for the C function 	     
+    input <- list(X=X,
+               y=as.double(Y),
+               ygt0= as.integer(which(Y>0L)-1),
+               offset=as.double(offset),
+               pWt=as.double(weights),
+               mu = double(dims["n.obs"]),
+               eta = double(dims["n.obs"]),
+               inits = inits,
+               beta=as.double(inits[[1]][1:n.beta]),
+               phi=as.double(inits[[1]][n.beta+1]),
+               p=as.double(inits[[1]][n.beta+2]),
+               link.power=as.double(link.power),
+               pbeta.mean=as.double(prior.beta.mean),
+               pbeta.var=as.double(prior.beta.var),
+               bound.phi=as.double(bound.phi),
+               bound.p=as.double(bound.p),    
+               ebeta.var=as.double(ebeta.var),
+               ep.var= as.double(ep.var),
+               ephi.var = as.double(ephi.var),               
+               dims=dims,
+               tune.weight=as.double(tune.weight))
+  
+  if (method=="dtweedie")
+    sims.list<- .Call("bcpglm_gibbs_tw",input) 
+  if (method=="latent")
+    sims.list<- .Call("bcpglm_gibbs_lat",input)
+                  
+  sims.list <- lapply(sims.list, function(x){ 
+                  dimnames(x) <- list(NULL, c(xnames,"phi","p"))
+                  return(x)})  
+  # coerce to mcmc object                  
+  sims <- lapply(sims.list, as.mcmc)
+  sims <- as.mcmc.list(sims)
+                         
+  out <- list(dims = dims,sims.list=sims, inits = inits)
+  return(out)
 }
 
 # check initial values of bcpglm input inits
@@ -217,4 +223,4 @@ check.inits <- function(inits, n.chains, bound.p, n.beta){
   				  n.beta+2))
     }  	
 }
-    
+

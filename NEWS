@@ -1,4 +1,42 @@
 ================
+Version 0.3-1
+================
+NEW FEATURES
+
+   o Function 'cpglmm' is added that handles mixed-effect models using 
+	Laplace approximations. This is based on the R package 'lme4'.       
+   o Function 'bcpglm' now has a second method to fit Bayesian compound
+	Poisson GLM using direct Tweedie density approximation. 
+   o Function 'bcpglm' also has a tuning phase that automatically updates
+	the scale parameter in the proposal distribution. 
+   o The profile likelihood method in 'cpglm' is now automated
+
+CHANGES:
+   (user-visible)	
+   o Prior distribution of the dispersion parameter in 'bcpglm' is
+	changed to be Uniform, specified in the argument 'bound.phi'
+   o 'bcpglm' has another argument 'method' that allows users to choose
+	from the latent variable approach or direct density evaluation
+   o An insurance example 'insLoss' is added in 'bcpglm' 
+   o Remove the 'digits' parameter in control in 'cpglm' as the profile 
+	likelihood method is automated now 
+   o MCEM method in 'cpglm' simplifies the process of increase sample 
+	size. The old time-consuming method of estimating approximate 
+ 	covariance matrix is removed. So the 'alpha' parameter in control
+	is removed. 
+   o The default method in 'cpglm' is now set to be 'profile'
+   o Remove the 'summary' slot in 'bcpglm'
+   o The profile method in 'cpglm' now returns covariance estimate for the 
+	dispersion and index parameter 
+
+   (not user-visible):
+   o 'bcpglm' replaces ARMS with M-H update. Now the dependency on the 
+	ARMS functions is eliminated
+   o 'bcpglm' now generates starting values using 'cpglm'
+   o Simplify rejection sampling of latent variables (now twice faster)
+
+
+================
 Version 0.2-1
 ================
 NEW FEATURES
@@ -12,9 +50,9 @@ NEW FEATURES
 	and summarize posterior inference. 
 
 CHANGES:
-   (user-visable)	
+   (user-visible)	
    o Various methods defined for the class "bcplm" and "bcpglm"
-   (not user-visable, all in C code):
+   (not user-visible, all in C code):
    o Change the use of "R_alloc" in "lbfgsb" to "Calloc" and "Free" 
 	(the old function eats up memory quickly)
    o Simplify rejection sampling of latent variables (now twice faster)
@@ -22,7 +60,7 @@ CHANGES:
 ================
 Version 0.1-3 (not released)
 ================
-CHANGES (not user-visable, all in C code):
+CHANGES (not user-visible, all in C code):
    o Fix a bug in rejection sampling of the latent variable 
    o Fix a bug in specifying weights
    o Divide cpglm_str into three parts, one for data and parameters, 
@@ -40,7 +78,7 @@ NEW FEATURES
 CHANGES:
 
    o The MCEM algorithm is now implemented in pure C code
-   o Remove the restrict on the "weights" argument (but not tested)
+   o Remove the restriction on the "weights" argument (but not tested)
    o Add "beta.step" in "control" to allow skips in the update of beta
    o Allow "link" to be both character and numeric
    o Force coercion of argument type before callings the C function

@@ -4,12 +4,12 @@
 \alias{cpglm_profile}
 \title{Compound Poisson Generalized Linear Model
 }
-\description{This function fits generalized linear models with the Tweedie compound Poisson distribution. 
+\description{This function fits compound Poisson generalized linear models. 
 }
 \usage{
 cpglm(formula, link = "log", data, weights, offset, subset, 
   na.action, betastart = NULL,phistart = NULL, pstart = NULL, 
-  contrasts = NULL, control = list(), method="MCEM", ...)
+  contrasts = NULL, control = list(), method="profile", ...)
   
 cpglm_em(X, Y, weights = NULL, offset = NULL, link.power = 0,
   betastart, phistart, pstart, intercept = TRUE, control = list())  
@@ -33,7 +33,7 @@ cpglm_profile(X, Y, weights = NULL, offset = NULL,
 }
   \item{betastart}{starting values for the vector of mean parameters.
 }
-  \item{phistart}{starting value for the dispersion parameter.
+  \item{phistart}{starting value for the dispersion (scale) parameter.
 }
   \item{pstart}{starting value for the index parameter. Must be between 1 and 2. When \code{bound.p} is specified, \code{pstart} must be between the bounds set there.  
 }
@@ -41,15 +41,15 @@ cpglm_profile(X, Y, weights = NULL, offset = NULL,
 }
   \item{contrasts}{an optional list. See the \code{contrasts.arg}.
 }
-  \item{control}{a list of parameters for controlling the fitting process. See 'Details' below. 
+  \item{control}{a list of parameters for controling the fitting process. See 'Details' below. 
 } 
-  \item{method}{a character string, either \code{"MCEM"} or \code{"profile"}, indicating whether the Monte Carlo EM algorithm or the profiled log-likelihood method should be used.  See 'Details' below.
+  \item{method}{a character string, either \code{"profile"} or \code{"MCEM"}, indicating whether  the profiled log-likelihood method or the Monte Carlo EM algorithm should be used.  See 'Details' below. The default is \code{"profile"}. 
 }
-  \item{X, Y}{Used in \code{cpglm_em} and \code{cpglm_profile}: \code{X} is a design matrix and \code{Y} is a vector of observations.  
+  \item{X, Y}{used in \code{cpglm_em} and \code{cpglm_profile}: \code{X} is a design matrix and \code{Y} is a vector of observations.  
 }
   \item{intercept}{logical. Should an intercept be included in the \code{null} model?
 }
- \item{link.power}{see  \code{\link[statmod]{tweedie}}.
+ \item{link.power}{used in \code{cpglm_em} and \code{cpglm_profile} and must be numeric. See  \code{\link[statmod]{tweedie}} for details.
 }
   \item{\dots}{ not used now. 
 }
@@ -57,32 +57,21 @@ cpglm_profile(X, Y, weights = NULL, offset = NULL,
 }
 
 \details{
-The Tweedie compound Poisson distribution is a subclass of the exponential dispersion family with a power variance function, where the value of the power index lies in the interval (1,2). The distribution is composed of a probability mass at the origin accompanied by a skewed continuous distribution on the positive values. Despite its ability to handle continuous zero-inflated data, the density of the compound Poisson distribution is not analytically tractable. As a result, full maximum likelihood inference remains challenging when the power index is unknown. The \code{cpglm} function implements two methods to fit generalized linear models with the compound Poisson distribution, namely, the  Monte Carlo EM [MCEM]  algorithm and the profile likelihood approach, both of which yield maximum likelihood estimates for all parameters in the model, in particular, for the dispersion and the index parameter. 
+The Tweedie compound Poisson distribution is a subclass of the exponential dispersion family with a power variance function, where the value of the power index lies in the interval (1,2). The distribution is composed of a probability mass at the origin accompanied by a skewed continuous distribution on the positive values. Despite its ability to handle continuous zero-inflated data, the density of the compound Poisson distribution is not analytically tractable. As a result, full maximum likelihood inference remains challenging when the power index is unknown. The \code{cpglm} function implements two methods to fit generalized linear models with the compound Poisson distribution - the profile likelihood approach and the  Monte Carlo EM [MCEM]  algorithm.  Both methods yield maximum likelihood estimates for all parameters in the model, in particular, for the dispersion and the index parameter. 
  
-The MCEM approach is in light of the fact that the compound Poisson distribution involves an unobserved Poisson process. The observed data is thus augmented by the latent Poisson variable so that one could work on the joint likelihood of the complete data and invoke the MCEM algorithm to locate the maximum likelihood estimations. Specifically, a Monte Carlo method is implemented in the E-step, where samples of the unobserved Poisson process is simulated from its posterior via rejection sampling (using a zero-truncated Poisson as a proposal), and the required expectation in the E-step is approximated by a Monte Carlo estimate. The M-step involves conditional component-wise maximization: scoring algorithm is used for the mean parameters, constrained optimization for the index parameter and close-form solution exists for the scale parameter. The E-step and the M-step are iterated until the following stopping rule is reached:
+ 
+In the profiled likelihood approach, the index and the dispersion parameters are estimated based on the profiled likelihood first and then the mean parameters are estimated using a GLM with the above-estimated index parameter. To compute the profiled likelihood, one has to resort to numerical methods provided in the  \code{tweedie} package for approximating the density of the compound Poisson distribution. Indeed, the function  \code{\link[tweedie]{tweedie.profile}} in that package makes available the profiled likelihood approach. The function here differs from \code{\link[tweedie]{tweedie.profile}} in that the user does not need to specify the grid of possible values the index parameter can take. Instead, the optimization of the profiled likelihood is automated. It is also to be noted that only MLE estimate for \eqn{\phi} is included here, while \code{\link[tweedie]{tweedie.profile}} provides several other possibilities.  
+
+The second approach uses the MCEM algorithm, in light of the fact that the compound Poisson distribution involves an unobserved Poisson process. The observed data is thus augmented by the latent Poisson variable so that one could work on the joint likelihood of the complete data and invoke the MCEM algorithm to locate the maximum likelihood estimations. Different from the profiled likelihood approach, this method does not require direct numerical approximation to the density, and can be generalized to mixed-effect models and other compounded distribution. However, it could be slow due to the Monte Carlo simulations and the slow convergence of the EM algorithm. So users should use the profiled likelihood approach as a first choice and consider the MCEM algorithm when numerical approximations break down (see \code{\link[tweedie]{tweedie.profile}}). 
+
+For the MCEM algorithm, samples of the unobserved Poisson process is simulated and  the required expectation in the E-step is approximated by a Monte Carlo estimate. The M-step involves conditional component-wise maximization: scoring algorithm for the mean parameters, constrained optimization for the index parameter and close-form computation for the scale parameter. The E-step and the M-step are iterated until the following stopping rule is reached:
 \deqn{\max_i \frac{|\theta_i^{(r+1)}-\theta_i^{(r)}|}{\theta_i^{(r)}+\epsilon_1}<\epsilon_2,
 }
-where \eqn{\theta_i} is the \eqn{i_{th}} element of the vector of parameters, \eqn{r} represents the \eqn{r_{th}} iteration, and \eqn{\epsilon_1} and \eqn{\epsilon_2} are predefined constants. See the description for the \code{control} parameters below. 
-
-Alternatively, one could use the profiled likelihood approach, where the index parameter is estimated based on the profiled likelihood first and then a traditional GLM is fitted. This is because the mean parameters and the index parameter (\eqn{p}) are orthogonal, meaning that the mean parameters vary slowly as \eqn{p} changes. Specifically, to get a profiled maximum likelihood estimate of \eqn{p}, one needs to specify a grid of possible values of \eqn{p}, estimates the corresponding mean and dispersion parameters, and computes the associated likelihood. Then these likelihoods are compared to locate the value of \eqn{p} corresponding to the maximum likelihood.  To compute the likelihood, one has to resort to numerical methods provided in the  \code{tweedie} package that approximate the density of the compound Poisson distribution. Indeed, the function  \code{\link[tweedie]{tweedie.profile}} in that package makes available the profiled likelihood approach. What is included here is simply a wrapper that provides automatic estimation of \eqn{p} to any pre-specified decimal places (see \code{decimal} in the following). Only MLE estimate for \eqn{\phi} is included here, while \code{\link[tweedie]{tweedie.profile}} provides several other possibilities.  
-
-
-These two methods are specified in the \code{method} argument in \code{cpglm}. The MCEM algorithm is invoked by specifying \code{method="MCEM"} in \code{cplm}, while the profile likelihood approach is used when \code{method="profile"}. The two methods can also be invoked by calling the function \code{cpglm_em} and \code{cpglm_profile}, however, the users are encouraged to use \code{cpglm}, which uses \code{cpglm_em} and \code{cpglm_profile} internally.
-
-
-It is to be noted that the MCEM algorithm enables one to work on the more tractable joint likelihood, thus simplifying the estimation problem down to posterior simulation and block/univariate optimizations. However, it also has some overheads:
-\itemize{
-  \item The simulation of the latent variable could be computationally demanding when a large number of samples is needed;
-  \item The inherent Monte Carlo error must be accounted for;
-  \item The EM algorithm could have slow convergence rate.
-}
-The computational demand can be largely reduced by supplementing the algorithm with importance sampling after it converges to the neighborhood of the MLEs. The importance sampling retains the latest simulated samples for use in all later iterations, thus eliminating the need for simulating new samples. 
-
-To account for the Monte Carlo error, many authors have suggests increasing the sample size as the algorithm proceeds. Booth and Hobert (1999) derives a Normal approximation for the Monte Carlo error, which is further used to construct a (1-\code{alpha}) confidence ellipsoid at each iteration. If the old parameters lie in this ellipsoid, then the sample size is increase as \eqn{m + m/k}, where \eqn{m} is the current sample size, and \eqn{k} is a predefined constant. This method is implemented when \code{fixed.size} in the control argument is \code{FALSE}. See the description for the \code{control} parameters below.    
+where \eqn{\theta_i} is the \eqn{i_{th}} element of the vector of parameters, \eqn{r} represents the \eqn{r_{th}} iteration, and \eqn{\epsilon_1} and \eqn{\epsilon_2} are predefined constants. To account for the Monte Carlo error, we also implement a simple approach that allows the probability of increasing the sample size at each iteration to be proportional to the relative change of the parameter values. So if the sample size is to be increased, then the new size is set to be \eqn{m + m/k}, where \eqn{m} is the current sample size, and \eqn{k} is a predefined constant. This method is implemented when \code{fixed.size} in the control argument is \code{FALSE}. See the description for the \code{control} parameters below.    
 
 
 
-The \code{control} argument is a list that can supply various controlling elements used in the fitting process. Most of these elements are used in the MCEM algorithm, and those used in the profile likelihood approach are explicitly identified in the following:
+The \code{control} argument is a list that can supply various controling elements used in the fitting process. Most of these elements are used in the MCEM algorithm, and those used in the profiled likelihood approach are explicitly identified in the following:
 
 \describe{
   \item{\code{init.size}}{initial number of samples used to generate the latent Poisson variable. Default is 100.}
@@ -90,22 +79,19 @@ The \code{control} argument is a list that can supply various controlling elemen
 \item{\code{max.iter}}{maximum number of iterations allowed in the algorithm. The default value is 200.}
 \item{\code{epsilon1}}{a constant used in the stopping rule. The default value is 0.001.}
 \item{\code{epsilon2}}{a constant used in the stopping rule. The default value is 0.0001.}
-\item{\code{fixed.size}}{a logical value indicating whether the sample size in each iteration is to be increased. If \code{FALSE}, approximate variance is computed in each iteration and the approximate (1-\code{alpha}) confidence ellipsoid is constructed. If the previously simulated value falls in this ellipsoid, then the sample size is increased by 1/\code{k} of the current sample size.  }
-\item{\code{alpha}}{the confidence level used in the above calculation of confidence ellipsoid. The default value is 0.25.}
+\item{\code{fixed.size}}{a logical value indicating whether the sample size in each iteration is to be increased.   }
 \item{\code{k}}{a constant used in the calculation of new sample size. The default value is 5.}
 \item{\code{max.size}}{the maximum sample size used in each iteration. When \code{fixed.size} is \code{FALSE}, the sample size in later iterations could be increasing without bound and as a result, the algorithm could be impractically slow. \code{max.size} sets the limit of the required sample size to avoid such slow computation. The default value is 10000. }
 \item{\code{bound.p}}{a vector of lower and upper bound for the index parameter \eqn{p}. The default is \code{c(1.01,1.99)}. Used in both \code{cpglm_em} and \code{cpglm_profile}.}
 \item{\code{beta.step}}{an integer. Since the mean parameters are orthogonal to \eqn{p} and not dependent on the latent variable, it is not necessary to update them in each step. By specifying \code{beta.step}, update of the mean parameters will only be performed every \code{beta.step} steps. It defaults to 10.}
 \item{\code{trace}}{if \code{TRUE} (the default), tracing information on the progress of the fitting is produced. Used in both \code{cpglm_em} and \code{cpglm_profile}.}
-\item{\code{profile.method}}{a character string indicating the method used in the Tweedie density evaluation. The default is \code{"inversion"}. If the default method fails, try other methods such as \code{"series"}. See \code{\link[tweedie]{dtweedie}} and \code{\link[tweedie]{tweedie.profile}}. This is only used the profile likelihood approach.}
-\item{\code{decimal}}{an integer indicating the accuracy of the profile likelihood approach in terms of the number of decimal places of \eqn{p}. For example, if \code{decimal=1}, then \eqn{p=1.1, 1.2, \dots, 1.9} (if they are within \code{bound.p}) will be used as the grid of possible values to estimate \eqn{p}. If \code{decimal=2} and suppose the estimated \eqn{p} from \code{decimal=1} is 1.4, then the grid is updated to be \code{seq(1.31,1.49, by=0.01)} and a new estimate of \eqn{p} is obtained. This procedure continues for higher accuracy. This is only used the profiled likelihood approach. }
 
 }
 
 }
 
 \value{
-  \code{cpglm} returns an object of class \code{cpglm}. See \code{\link{cpglm-class}} for details of the return values as well as various method available for this class. 
+  \code{cpglm} returns an object of class \code{"cpglm"}. See \code{\link{cpglm-class}} for details of the return values as well as various methods available for this class. 
 }
 
 \references{
@@ -116,8 +102,6 @@ Monte Carlo EM Algorithm.  \emph{Journal of the Royal Statistical Society Series
 
 \cite{McCulloch, C. E. (1997). Maximum likelihood algorithms for generalized linear mixed
 models. \emph{Journal of the American Statistical Association}, 92, 162-170.}
-
-\cite{Zhang Y. (2011). A Latent Variable Approach for Statistical Inference  in Tweedie Compound Poisson Linear Models, \emph{preprint}, \url{http://actuaryzhang.com/publication/bayesianTweedie.pdf}}.
 
 }
 
@@ -132,18 +116,9 @@ The users are recommended to see the documentation for \code{\link{cpglm-class}}
 
 \examples{
 
-\dontrun{
-# MCEM fit
-set.seed(10)
+# profile likelihood         
 fit1 <- cpglm(RLD~ factor(Zone)*factor(Stock),
-  data=fineroot,
-  control=list(init.size=5,sample.iter=50,
-              max.size=2000,fixed.size=FALSE),
-  pstart=1.6)
-
-# show the iteration history of p
-plot(fit1$theta.all[,ncol(fit1$theta.all)],
-     type="o", cex=0.5)
+  data=fineroot)
      
 # residual and qq plot
 parold <- par(mfrow=c(2,2), mar=c(5,5,2,1))
@@ -160,16 +135,25 @@ qqnorm(r2, cex=0.5)
 
 par(parold)
 
-# profile likelihood         
+\dontrun{
+# MCEM fit, slower than the above 
+set.seed(12)
 fit2 <- cpglm(RLD~ factor(Zone)*factor(Stock),
-  data=fineroot,method="profile", 
-  control=list(decimal=3))      
+  data=fineroot, method="MCEM",
+  control=list(init.size=5,sample.iter=50,
+              max.size=200,fixed.size=FALSE),
+  pstart=1.6)
+
+
+# show the iteration history of p
+plot(fit2$theta.all[,ncol(fit2$theta.all)],
+     type="o", cex=0.5)
 
 # compare the two
 summary(fit1)
-summary(fit2)              
-            
-}
+summary(fit2)
+}            
+
 
 }
 % Add one or more standard keywords, see file 'KEYWORDS' in the

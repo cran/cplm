@@ -4,29 +4,32 @@ useDynLib(cplm)
 #  import 
 ############################
 
-importFrom(stats,  predict, coef, vcov, residuals, resid, 
+importFrom(stats,  predict, coef, residuals, resid, 
 		fitted, fitted.values, df.residual, AIC, deviance,
 		terms, formula, model.matrix)
 importFrom(methods, show)
 importFrom(graphics, plot)
-importFrom(Matrix, summary)
+import(Matrix)
 import(coda)
-
+importClassesFrom(lme4, mer, summary.mer)
+importMethodsFrom(lme4, VarCorr, vcov)
 
 ############################
-#  import 
+#  export 
 ############################
 # function 
 export(cpglm)
 export(cpglm_em)
 export(cpglm_profile)
 export(bcpglm)
+export(cpglmm)
 
 #Classes
-exportClasses(cpglm, bcplm, bcpglm)
+exportClasses(cpglm, bcplm, bcpglm, cpglmm, summary.cpglmm)
 exportClasses(NullNum, NullList, NullFunc)
            
 #Methods
 exportMethods(summary, show,  "$", "[[", "[", names, coef, vcov, 
               residuals, resid, fitted, fitted.values, df.residual,
-		  AIC, deviance, terms, formula, model.matrix, plot)
+		  AIC, deviance, terms, formula, model.matrix, plot,
+		  VarCorr)

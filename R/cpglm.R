@@ -6,8 +6,8 @@
 cpglm <- function(formula, link = "log", data, weights, offset, 
                   subset, na.action, betastart=NULL, phistart=NULL, 
                   pstart=NULL, contrasts = NULL, control=list(),
-                  method ="MCEM", ...) {
-  
+                  method ="profile", ...) {
+
   call <- match.call()  
   if (missing(data)) 
     data <- environment(formula)   
@@ -115,11 +115,11 @@ cpglm_em <- function(X,Y,weights=NULL,offset=NULL,
         names(Y)
     
     # default weights and offsets if NULL    
-    nobs <- NROW(Y)
+    n.obs <- NROW(Y)
     if (is.null(weights))     
-      weights <- rep.int(1, nobs)
+      weights <- rep.int(1, n.obs)
     if (is.null(offset)) 
-        offset <- rep.int(0, nobs)          
+        offset <- rep.int(0, n.obs)          
     # generating starting values if necessary
     if (is.null(pstart)) 
       pstart <- sum(control$bound.p)/2
@@ -133,11 +133,11 @@ cpglm_em <- function(X,Y,weights=NULL,offset=NULL,
         phistart <- sum(residuals(fit.start,"pearson")^2)/
           df.residual(fit.start)
     }
-
-    out <- .Call("cpglm_em",
+    
+      out <- .Call("cpglm_em",
                  X=as.double(X),
                  Y=as.double(Y),
-                 ygt0= as.integer(which(Y>0L)),
+                 ygt0= as.integer(which(Y>0L)-1),
                  offset=as.double(offset),
                  weights=as.double(weights),
                  beta=as.double(betastart),
@@ -149,19 +149,19 @@ cpglm_em <- function(X,Y,weights=NULL,offset=NULL,
                  sample.iter=as.integer(control$sample.iter),
                  max.iter=as.integer(control$max.iter),
                  epsilon1=as.double(control$epsilon1),
-                 epsilon2=as.double(control$epsilon2),
-                 alpha=as.double(control$alpha),                   
+                 epsilon2=as.double(control$epsilon2),                  
                  ck = as.double(control$k),                                    
                  fixed.size=as.integer(control$fixed.size),
                  trace=as.integer(control$trace),
                  max.size=as.integer(control$max.size),
                  beta.step=as.integer(control$beta.step))
+    
     out$vcov <- svd.inv(out$hess)
     out <- out[!(names(out)=="hess")]
     out$df.residual <- nrow(X) - ncol(X)                         
     out$deviance <- sum(tweedie.dev(Y,out$fitted.values, out$p)) 
     out$aic <- -2 * sum(log(dtweedie(Y, mu = out$fitted.values, 
-                phi = out$phi, power = out$p))) + 2*(ncol(X) +2)
+                phi = out$phi, power = out$p))) + 2*ncol(X)
     out$prior.weights <- weights
     out$offset <- offset 
     out$converged <- as.logical(out$converged)                       
@@ -172,52 +172,77 @@ cpglm_em <- function(X,Y,weights=NULL,offset=NULL,
     return(out)        
 }   
 
-# function to implement the automatic profile likelihood approach 
+# function to implement the  profile likelihood approach 
 cpglm_profile <- function(X,Y,weights=NULL,offset=NULL,
                       link.power=0, intercept=TRUE, 
                       contrasts, control=list()){
   control <- do.call("cpglm.control", control)
-  if (control$trace) {
-        cat("---\n This function is based on 'tweedie.profile' in the 'tweedie' package;\n")
-        cat(" If it fails, try using  method=\"series\"\n")
-        cat(" rather than the default  method=\"inversion\"\n")
-        cat(" Another possible reason for failure is the range of p:\n")
-        cat(" Try a different boundary for 'bound.p'\n---\n")
-  }  
-  pl <- ceiling(control$bound.p[1]*10)/10
-  pu <- floor(control$bound.p[2]*10)/10    
-  for (i in 1:control$decimal){  
-    p.vec <- seq(pl,pu,by=10^(-i))
-    fit <- tweedie_profile(X=X, Y=Y, weights=weights, offset=offset,
-                           link.power=link.power,p.vec=p.vec,
-                           verbose=control$trace,intercept=intercept)
-    cc <- 10^i                            
-    if (i==control$decimal)
-      break else{
-      pl <- max(ceiling(control$bound.p[1]*10*cc)/(10*cc), 
-               fit$p.max-1/cc+1/(cc*10))                 
-      pu <- min(floor(control$bound.p[2]*10*cc)/(10*cc), 
-               fit$p.max+1/cc-1/(cc*10))     
-     }                            
+   
+  # profiled likelihood 
+  llik_profile <- function(parm){
+    phi <- exp(parm[1])
+    p <- parm[2]
+    fit2 <- glm.fit(X,Y,weights=weights,offset=offset,
+                  family=tweedie(var.power=p,
+                                 link.power=link.power),
+                  intercept=intercept) 
+    -2*sum(log(dtweedie.series(Y,p,fit2$fitted.values,phi)))    
   }
-  # fit glm using the maximized p
-  fit2 <- glm.fit(X,Y,weights=weights,offset=offset,
-                  family=tweedie(var.power=fit$p.max,
+  
+  # generate starting values for phi
+  pstart <- 1.5
+  fit <- glm.fit(X,Y,weights=weights,offset=offset,
+                  family=tweedie(var.power=pstart,
                                  link.power=link.power),
                   intercept=intercept)  
-  class(fit2) <- "glm"
+  mu <- fit$fitted.values
+  phistart <- sum((Y-mu)^2/mu^pstart)/fit$df.residual
+  parm <- c(log(phistart),pstart)
+  
+  # optimize the profiled loglikelihood
+  opt_ans <- optim(parm,llik_profile,gr=NULL,method="L-BFGS-B",
+                      lower=c(-Inf,control$bound.p[1]),
+                      upper=c(Inf,control$bound.p[2]),
+                      control=list(trace=control$trace))
+  p.max <- opt_ans$par[2]
+  phi.max <- exp(opt_ans$par[1])
+
+  # fit glm using the optimized index parameter
+  fit <- glm.fit(X,Y,weights=weights,offset=offset,
+                  family=tweedie(var.power=p.max,
+                                 link.power=link.power),
+                  intercept=intercept)
+  class(fit) <- "glm" 
+  
+  # compute vcov for p and phi  
+  llik_profile2 <- function(parm){
+    phi <- parm[1]
+    p <- parm[2]
+    fit2 <- glm.fit(X,Y,weights=weights,offset=offset,
+                  family=tweedie(var.power=p,
+                                 link.power=link.power),
+                  intercept=intercept) 
+    -sum(log(dtweedie.series(Y,p,fit2$fitted.values,phi)))    
+  }
+  pm <- c(phi.max,p.max) 
+  hs <- hess(pm,llik_profile2)
+  dimnames(hs) <- list(c("phi","p"),c("phi","p"))  
+  vc <- vcov(fit)
+  attr(vc,"phi_p") <- solve(hs)
+    
+  # return results
   out <- c(list(
-             deviance=sum(tweedie.dev(Y, fit2$fitted.values,fit$p.max)),
-             aic=-2*fit$L.max+2*(fit2$rank+2),
+             deviance=sum(tweedie.dev(Y, fitted(fit),p.max)),
+             aic=dtweedie.nlogl(Y,fitted(fit),phi.max,p.max)+2*fit$rank,
              control=control,
-             p=fit$p.max,
-             phi=fit$phi.max,             
-             theta=c(fit2$cofficients,fit$p.max,fit$phi.max),
-             theta.all=matrix(c(fit2$cofficients,fit$p.max,fit$phi.max),
+             p=p.max,
+             phi=phi.max,             
+             theta=c(fit$cofficients,phi.max,p.max),
+             theta.all=matrix(c(fit$cofficients,phi.max,p.max),
                               nrow=1),
-             vcov=vcov(fit2),
+             vcov=vc,
              offset=offset),
-             fit2[c("coefficients","residuals","fitted.values",
+             fit[c("coefficients","residuals","fitted.values",
                     "linear.predictors","iter","weights",
                     "prior.weights","df.residual","converged")])  
   return(out)  
@@ -225,9 +250,8 @@ cpglm_profile <- function(X,Y,weights=NULL,offset=NULL,
 
 
 # function to compute log density 
-dtweedie.nlogl <- function(phi, y, mu, power) {
-    ans <- -2 * sum(log(dtweedie(y = y, mu = mu, phi = phi, 
-        power = power)))
+dtweedie.nlogl <- function(y, mu, phi,power) {
+    ans <- -2 * sum(log(dtweedie(y = y, mu = mu, phi = phi, power = power)))
     if (is.infinite(ans)) {
         ans <- sum(tweedie.dev(y = y, mu = mu, power = power))/length(y)
     }    
@@ -236,85 +260,6 @@ dtweedie.nlogl <- function(phi, y, mu, power) {
     ans
 }
     
-tweedie_profile <- function (X,Y,weights=NULL,offset=NULL,
-                       p.vec = NULL, link.power=0,  
-                       method = "inversion",  verbose = FALSE,
-                       intercept =TRUE) {
-    if (is.logical(verbose)) 
-        verbose <- as.numeric(verbose)    
-    np <- length(p.vec)
-    if (np<1)
-      stop ("'p.vec' must have at least one element")
-    nY <- length(Y)                                     
-    L <- phi.vec <- rep(NA, np)
-                                         
-    for (i in (1:np)) {
-        p <- p.vec[i]
-        if (verbose) 
-            cat(paste("p= ", p, "\n", sep = ""))
-        catch.possible.error <- try(fit.model <- glm.fit(x = X, 
-            y = Y, weights = weights, offset = offset, 
-            family = tweedie(var.power = p, link.power = link.power),
-            intercept = intercept), 
-            silent = TRUE)
-        skip.obs <- FALSE
-        if (class(catch.possible.error) == "try-error") 
-            skip.obs <- TRUE        
-        if (skip.obs) {
-            warning(paste("  Problem near p= ", 
-                p, "; this error reported:\n     ", catch.possible.error, 
-                " Examine the data and function inputs carefully."))
-            mu <- rep(NA, nY)
-        } else 
-            mu <- fitted(fit.model)        
-        if (verbose) 
-            cat("* Phi estimation")
-        if (skip.obs) {
-            if (verbose) 
-                cat("; but skipped for this obs\n")
-            phi.vec[i] <- NA
-        } else {
-            if (verbose) 
-                cat(" (using optimize): ")
-            phi.est <- sum(tweedie.dev(y = Y, mu = mu, power = p))/nY
-            low.limit <- min(0.001, phi.est/2)    
-            ans <- optimize(f = dtweedie.nlogl, maximum = FALSE, 
-                    interval = c(low.limit, 10 * phi.est), power = p, 
-                    mu = mu, y = Y)
-            phi.vec[i] <- ans$minimum
-            if (verbose) 
-                  cat(" Done (phi =", phi.vec[i], ")\n")
-        }
-        if (verbose) {
-            cat("* Computing the log-likelihood ")
-            cat("(method =", method, "):")
-        }
-        if (skip.obs) {
-            if (verbose) 
-                cat(" but skipped for this obs\n")
-            L[i] <- NA
-        } else {
-            if (method == "saddlepoint") 
-                L[i] <- dtweedie.logl.saddle(y = Y, mu = mu, 
-                  power = p, phi = phi.vec[i], eps = 1/6) else 
-                L[i] <- switch(pmatch(method, c("interpolation", 
-                        "series", "inversion"), nomatch = 2), 
-                        `1` = dtweedie.logl(mu = mu, power = p, phi = phi.vec[i], y = Y), 
-                        `2` = sum(log(dtweedie.series(y = Y,  mu = mu, power = p, phi = phi.vec[i]))), 
-                        `3` = sum(log(dtweedie.inversion(y = Y, mu = mu, power = p, phi = phi.vec[i]))))
-        }
-       if (verbose) 
-            cat(" L =", L[i], "\n")
-    }
-    L.max <- max(L)
-    p.max <- p.vec[L == L.max]
-    phi.max <- phi.vec[L == L.max]
-                      
-    out <- list(p = p.vec, phi=phi.vec, L=L, 
-                p.max = p.max, phi.max = phi.max, L.max = L.max, 
-                method = method)
-    return(out)  
-}
   
 # function to take inverse of a matrix using svd 
 svd.inv <- function(x){
@@ -342,14 +287,11 @@ cpglm.control <- function(init.size=100L,
                        max.iter=200,
                        epsilon1=1e-03,
                        epsilon2=1e-04,
-                       alpha =0.25,
                        k=5,                       
                        bound.p=c(1.01,1.99),
                        fixed.size=TRUE,   
                        beta.step=10,
-                       trace=TRUE,
-                       profile.method="inversion",
-                       decimal=3){
+                       trace=0){
   if (!is.numeric(init.size) || init.size <= 0)
         stop("value of sample.size should be an integer and >0")
   if (!is.numeric(sample.iter) || sample.iter <= 0)
@@ -358,9 +300,7 @@ cpglm.control <- function(init.size=100L,
         stop("value of 'epsilon1' must be > 0")
   if (!is.numeric(epsilon2) || epsilon2 <= 0) 
         stop("value of 'epsilon2' must be > 0") 
-  if (!is.numeric(alpha) || alpha <= 0 || alpha>=1) 
-        stop("value of 'alpha' must be between 0 and 1")               
-  if (!is.numeric(k) || k <= 0) 
+   if (!is.numeric(k) || k <= 0) 
         stop("value of 'k' must be > 0")         
   if (!is.numeric(max.iter) || max.iter <= 0) 
         stop("value of 'maxit' must be > 0")
@@ -372,32 +312,52 @@ cpglm.control <- function(init.size=100L,
         stop("value of 'beta.step' must be greater than 0")          
   if (!is.numeric(trace) && !is.logical(trace))
         stop("'trace' must be logical or numeric")
-  if (!is.numeric(decimal) || decimal<=0 )
-        stop("'decimal' must be a positive integer")
-  if (!(profile.method %in% c("series","inversion",
-                              "interpolation","saddlepoint")))
-        stop("invalid 'profile.method'")
   bound.p <- sort(bound.p)
   fixed.size <- as.logical(fixed.size)
-  trace <- as.logical(trace)
+  trace <- as.integer(trace)
   
     list(init.size=init.size,
          sample.iter=sample.iter,
          max.iter=max.iter,
          epsilon1 = epsilon1,
          epsilon2=epsilon2,
-         alpha=alpha,
          k=k,
          fixed.size=fixed.size,
          max.size=max.size,
          bound.p=bound.p,
          beta.step=beta.step,
-         trace=trace,
-         profile.method=profile.method,
-         decimal=decimal)  
+         trace=trace)  
 }
 
+# function to compute gradient
+grad <- function(parm, fun){
+  n <- length(parm)
+  eps <- 0.001
+  gd <- rep(NA,n)
+  for (i in 1:n){
+    parm[i] <- parm[i]- eps
+    g1 <- fun(parm)
+    parm[i] <- parm[i]+2*eps
+    g2 <- fun(parm)
+    gd[i] <- (g2-g1)/(2*eps)
+  }
+  return(gd)
+}
 
+# function to compute hessian
+hess <- function(parm, fun){
+  n <- length(parm)
+  eps <- 0.001
+  hn <- matrix(0,n,n)
+  for (i in 1:n){
+    parm[i] <- parm[i]- eps
+    g1 <- grad(parm,fun)
+    parm[i] <- parm[i]+2*eps
+    g2 <- grad(parm,fun)
+    hn[i,] <- (g2-g1)/(2*eps)
+  }
+  return(hn)  
+}
 
 
 
