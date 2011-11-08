@@ -8,11 +8,11 @@
 }
 \usage{
 cpglm(formula, link = "log", data, weights, offset, subset, 
-  na.action, betastart = NULL,phistart = NULL, pstart = NULL, 
-  contrasts = NULL, control = list(), method="profile", ...)
+  na.action, inits = NULL, contrasts = NULL, control = list(),
+  method="profile", ...)
   
 cpglm_em(X, Y, weights = NULL, offset = NULL, link.power = 0,
-  betastart, phistart, pstart, intercept = TRUE, control = list())  
+  inits=NULL, intercept = TRUE, control = list())  
   
 cpglm_profile(X, Y, weights = NULL, offset = NULL, 
   link.power = 0, intercept = TRUE, contrasts, control = list())                      
@@ -31,11 +31,7 @@ cpglm_profile(X, Y, weights = NULL, offset = NULL,
 }
   \item{na.action}{a function which indicates what should happen when the data contain \code{NA}s. The default is set by the \code{na.action} setting of options, and is \code{na.fail} if that is unset.  Another possible value is \code{NULL}, no action. Value \code{na.exclude} can be useful.
 }
-  \item{betastart}{starting values for the vector of mean parameters.
-}
-  \item{phistart}{starting value for the dispersion (scale) parameter.
-}
-  \item{pstart}{starting value for the index parameter. Must be between 1 and 2. When \code{bound.p} is specified, \code{pstart} must be between the bounds set there.  
+  \item{inits}{a named list that provides starting values for the vector of mean parameters ('beta'), the dispersion (scale) parameter ('phi') and the index parameter ('p').
 }
   \item{offset}{this can be used to specify an a priori known component to be included in the linear predictor during fitting. This should be \code{NULL} or a numeric vector of length equal to the number of cases. One or more offset terms can be included in the formula instead or as well, and if more than one is specified their sum is used. 
 }
@@ -136,14 +132,12 @@ qqnorm(r2, cex=0.5)
 par(parold)
 
 \dontrun{
-# MCEM fit, slower than the above 
+# MCEM fit
 set.seed(12)
 fit2 <- cpglm(RLD~ factor(Zone)*factor(Stock),
   data=fineroot, method="MCEM",
   control=list(init.size=5,sample.iter=50,
-              max.size=200,fixed.size=FALSE),
-  pstart=1.6)
-
+              max.size=200,fixed.size=FALSE)) 
 
 # show the iteration history of p
 plot(fit2$theta.all[,ncol(fit2$theta.all)],
@@ -152,6 +146,14 @@ plot(fit2$theta.all[,ncol(fit2$theta.all)],
 # compare the two
 summary(fit1)
 summary(fit2)
+
+# provide initial values
+inits <- list(beta=rnorm(length(coef(fit1))), phi=0.3, p=1.6)
+fit3 <- cpglm(RLD~ factor(Zone)*factor(Stock),
+  data=fineroot, method="MCEM",
+  control=list(init.size=5,sample.iter=50,
+              max.size=200,fixed.size=FALSE), 
+  inits = inits)
 }            
 
 

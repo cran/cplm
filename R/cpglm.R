@@ -4,9 +4,8 @@
 #######################################################
 
 cpglm <- function(formula, link = "log", data, weights, offset, 
-                  subset, na.action, betastart=NULL, phistart=NULL, 
-                  pstart=NULL, contrasts = NULL, control=list(),
-                  method ="profile", ...) {
+                  subset, na.action, inits=NULL, contrasts = NULL, 
+                  control=list(), method ="profile", ...) {
 
   call <- match.call()  
   if (missing(data)) 
@@ -25,36 +24,15 @@ cpglm <- function(formula, link = "log", data, weights, offset,
   weights <- as.vector(model.weights(mf))
   offset <- as.vector(model.offset(mf))
   link.power <- make.link.power(link)
-
-  if (!is.null(weights) && !is.numeric(weights)) 
-        stop("'weights' must be a numeric vector")
-    if (!is.null(weights) && any(weights <= 0)) 
-        stop("negative or zero weights not allowed")
-  if (!is.null(offset)) {
-    if (length(offset) != NROW(Y)) 
-      stop(gettextf("number of 'offset' is %d should 
-                    equal %d (number of observations)", 
-                length(offset), NROW(Y)), domain = NA)
-    }
-  if (!is.null(betastart)){
-    if (length(betastart) != ncol(X))
-      stop(gettextf("number of 'betastart' is %d should 
-                    equal %d (number of mean parameters)", 
-                length(betastart), ncol(X)), domain = NA)
-    }
-  if (!is.null(phistart) && length(phistart)>1) 
-    stop("multiple values specified for 'phistart'")
-  if (!is.null(phistart) && phistart<=0)
-    stop("value of 'phistart' should be greater than 0")
-  if (!is.null(pstart) && length(pstart)>1) 
-    stop("multiple values specified for 'pstart'")
-  if (!is.null(pstart) && (pstart<=1 || pstart>=2))
-    stop("value of 'pstart' should be between 1 and 2")   
-
+  n.obs <- NROW(X)
+  n.beta <- NCOL(X)
+  
+  # check arguments 
+  check.args.cplm(call,n.obs)
+  
   if (method=="MCEM")
     cpfit <- cpglm_em(X,Y,weights=weights,offset=offset,
-                     link.power=link.power,
-                     betastart=betastart,phistart=phistart,pstart=pstart,
+                     link.power=link.power,inits=inits,
                      intercept=attr(mt, "intercept") > 0L,control=control)
   if (method=="profile")    
     cpfit <- cpglm_profile(X,Y,weights=weights,offset=offset,
@@ -70,12 +48,9 @@ cpglm <- function(formula, link = "log", data, weights, offset,
              weights=cpfit$weights,
              df.residual=cpfit$df.residual,
              deviance=cpfit$deviance,
-             aic=cpfit$aic,
-             offset=cpfit$offset,
-             prior.weights=cpfit$prior.weights,               
+             aic=cpfit$aic,           
              call=call,
-             formula=formula,
-             data=data,             
+             formula=formula,           
              control=cpfit$control,
              contrasts=contrasts,
              p=cpfit$p,
@@ -86,27 +61,25 @@ cpglm <- function(formula, link = "log", data, weights, offset,
              iter=cpfit$iter,
              converged=cpfit$converged,
              method=method,
-             y=Y,
              link.power=link.power,
-             na.action=attr(mf, "na.action"),
-             model.frame = mf
-             )  
+             model.frame = mf,
+             na.action = attr(mf,"na.action"),
+             offset = cpfit$offset,
+             prior.weights =cpfit$prior.weights,
+             y = Y,
+             inits = inits)  
   return(ans)
 }
 
 
 # function to run the MCEM 
 cpglm_em <- function(X,Y,weights=NULL,offset=NULL,
-                      link.power=0,
-                      betastart,phistart,pstart,
+                      link.power=0, inits=NULL,
                       intercept = TRUE,
                       control=list()){
     # set control options                        
     control <- do.call("cpglm.control", control)                   
-    if (!is.null(pstart)){
-      if (pstart<control$bound.p[1] || pstart>control$bound.p[2])
-        stop ("value of 'pstart' outside the 'control$bount.p'")
-    } 
+
     X <- as.matrix(X)          
     # get names
     xnames <- dimnames(X)[[2L]]
@@ -121,20 +94,22 @@ cpglm_em <- function(X,Y,weights=NULL,offset=NULL,
     if (is.null(offset)) 
         offset <- rep.int(0, n.obs)          
     # generating starting values if necessary
-    if (is.null(pstart)) 
-      pstart <- sum(control$bound.p)/2
-    if (is.null(betastart) || is.null(phistart)) {
+    if (!is.null(inits)){
+      check.inits.cpglm(inits, NCOL(X))
+      betastart <- inits$beta
+      phistart <- inits$phi
+      pstart <- inits$p
+    } else {
+      pstart <- 1.5
       fit.start <- glm(Y~-1+X,weights=weights,offset=offset,
                   family=tweedie(var.power=pstart,
                                  link.power=link.power))
-      if (is.null(betastart))
-        betastart <- as.numeric(fit.start$coefficients)
-      if (is.null(phistart))
-        phistart <- sum(residuals(fit.start,"pearson")^2)/
+      betastart <- as.numeric(fit.start$coefficients)
+      phistart <- sum(residuals(fit.start,"pearson")^2)/
           df.residual(fit.start)
     }
     
-      out <- .Call("cpglm_em",
+    out <- .Call("cpglm_em",
                  X=as.double(X),
                  Y=as.double(Y),
                  ygt0= as.integer(which(Y>0L)-1),

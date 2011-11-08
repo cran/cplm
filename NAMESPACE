@@ -23,10 +23,12 @@ export(cpglm_em)
 export(cpglm_profile)
 export(bcpglm)
 export(cpglmm)
+export(bcpglmm)
+export(igamma, iwish)
 
 #Classes
-exportClasses(cpglm, bcplm, bcpglm, cpglmm, summary.cpglmm)
-exportClasses(NullNum, NullList, NullFunc)
+exportClasses(cplm, cpglm, cpglmm, bcpglm, bcpglmm, summary.cpglmm)
+exportClasses(NullNum, NullList)
            
 #Methods
 exportMethods(summary, show,  "$", "[[", "[", names, coef, vcov, 

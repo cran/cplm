@@ -14,8 +14,8 @@
 \tabular{ll}{
 Package: \tab cplm\cr
 Type: \tab Package\cr
-Version: \tab 0.3-1\cr
-Date: \tab 2011-10-26\cr
+Version: \tab 0.4-1\cr
+Date: \tab 2011-10-08\cr
 License: \tab GPL version 2 or later
 }
 }

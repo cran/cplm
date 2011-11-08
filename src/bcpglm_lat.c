@@ -1,14 +1,16 @@
 /************************************************************/
 /*   Function for the Markov Chain Monte Carlo algorithm    */
 /*    in the Compound Poisson Generalized Linear Model      */
+/*            using the latent variable approach            */
 /*              Author:  Wayne Zhang                        */
 /*            actuary_zhang@hotmail.com                     */
 /************************************************************/
 
 /**
- * @file cpglm_bayes_lat.c
+ * @file bcpglm_lat.c
  * @brief Function for implementing the MCMC algorithm
- * in the Compound Poisson Generalized Linear Model            
+ * in the Compound Poisson Generalized Linear Model using
+ * the latent variable approach
  * @author Wayne Zhang                         
  */
 
@@ -59,19 +61,19 @@ static double bcpglm_post_p_lat(double x, void *data){
  * @return log posterior density
  */
 static double bcpglm_post_phi_lat(double x, void *data){
-  bcpglm_str *da = data ;
-  da_parm *dap = da->dap ;
-  int i, kk ;
-  double ld=0, p2=2-dap->p, p1=dap->p-1 ;
-  for (i=0; i<dap->nO; i++)
-    ld += pow(da->mu[i],p2) * dap->weights[i];
-  ld /= (- x*p2) ;
-  for (i=0; i<dap->nP; i++){
-    kk = dap->ygt0[i] ;
-    ld += - dap->Y[kk]*pow(da->mu[kk],-p1)*dap->weights[kk] /(x*p1) 
-      - log(x)* da->simTvec[i]/p1;
-  }
-  return ld ;
+    bcpglm_str *da = data ;
+    da_parm *dap = da->dap ;
+    int i, kk ;
+    double ld=0, p2=2-dap->p, p1=dap->p-1 ;
+    for (i=0; i<dap->nO; i++)
+        ld += pow(da->mu[i],p2) * dap->weights[i];
+    ld /= (- x*p2) ;
+    for (i=0; i<dap->nP; i++){
+        kk = dap->ygt0[i] ;
+        ld += - dap->Y[kk]*pow(da->mu[kk],-p1)*dap->weights[kk] /(x*p1) 
+            - log(x)* da->simTvec[i]/p1;
+    }
+    return ld ;
 }
 
 
@@ -129,7 +131,7 @@ double bcpglm_post_beta_lat(double *x,  void *data){
  *
  */
 static void bcpglm_mcmc_lat(bcpglm_str *da, int nR, int nit, int nbn,
-                        int nth, double **sims, double *acc_pct){
+                            int nth, double **sims, double *acc_pct){
     da_parm *dap = da->dap ;
     int nP = dap->nP, nB=dap->nB ; 
     double xtemp, *beta_sim ;
@@ -138,8 +140,9 @@ static void bcpglm_mcmc_lat(bcpglm_str *da, int nR, int nit, int nbn,
         phi_sd= sqrt(da->mh_phi_var) ;
     int  acc, accept[]={0,0,0}; 
     int i, j, iter, ns ;
-    beta_sim = Calloc(nB, double) ;
-
+    beta_sim = Alloca(nB, double) ;
+    R_CheckStack() ;
+    
     GetRNGstate() ;
     for (iter=0;iter<nit;iter++){
         if (nR>0 && (iter+1)%nR==0)
@@ -155,7 +158,7 @@ static void bcpglm_mcmc_lat(bcpglm_str *da, int nR, int nit, int nbn,
         
         // M-H update of p using truncated normal
         acc = metrop_tnorm_rw(dap->p, p_sd, xl_p, xr_p, &xtemp, 
-                                bcpglm_post_p_lat, (void *) da);
+                              bcpglm_post_p_lat, (void *) da);
         dap->p = xtemp ;
         accept[0] += acc ;
         R_CheckUserInterrupt() ;
@@ -171,7 +174,7 @@ static void bcpglm_mcmc_lat(bcpglm_str *da, int nR, int nit, int nbn,
 
         // M-H update of phi using truncated normal
         acc = metrop_tnorm_rw(dap->phi, phi_sd, 0, xr_phi, &xtemp, 
-                                bcpglm_post_phi_lat, (void *) da);
+                              bcpglm_post_phi_lat, (void *) da);
         dap->phi = xtemp ;
         accept[2] += acc ;
         R_CheckUserInterrupt() ;
@@ -192,7 +195,6 @@ static void bcpglm_mcmc_lat(bcpglm_str *da, int nR, int nit, int nbn,
         } 
     }
     PutRNGstate() ;
-    Free(beta_sim);
     // compute acceptance percentage
     for (i=0;i<3;i++)
         acc_pct[i] = accept[i]*1.0/nit ;
@@ -211,19 +213,14 @@ static void bcpglm_mcmc_lat(bcpglm_str *da, int nR, int nit, int nbn,
 SEXP bcpglm_gibbs_lat (SEXP x){
     // get dimensions
     int *dm = DIMS_ELT(x) ;
-    int nO = dm[nO_POS],
-        nP = dm[nP_POS],
-        nB = dm[nB_POS],
-        nit = dm[itr_POS],
-        nbn = dm[bun_POS], 
-        nth = dm[thn_POS],
-        nS = dm[kp_POS],
-        nR = dm[rpt_POS],
-        tn = dm[tnit_POS],
-        ntn = dm[ntn_POS];
+    int nO = dm[nO_POS], nP = dm[nP_POS],
+        nB = dm[nB_POS], nit = dm[itr_POS],
+        nbn = dm[bun_POS], nth = dm[thn_POS],
+        nS = dm[kp_POS], nR = dm[rpt_POS],
+        tn = dm[tnit_POS], ntn = dm[ntn_POS];
     int i, j, k;
     double acc_pct[]={0,0,0}, *init, **sims,
-        tnw = REAL(getListElement(x,"tune.weight"))[0];
+             tnw = REAL(getListElement(x,"tune.weight"))[0];
     SEXP inits = getListElement(x,"inits"), ans, ans_tmp;
 
     //allocate memory for struct and simulated values
@@ -249,68 +246,59 @@ SEXP bcpglm_gibbs_lat (SEXP x){
     // fill in struct da
     da->mu = MU_ELT(x) ;
     da->eta = ETA_ELT(x) ;
-    da->pbeta_mean = REAL(getListElement(x,"pbeta.mean")) ;
-    da->pbeta_var = REAL(getListElement(x,"pbeta.var")) ;
-    da->mh_beta_var = REAL(getListElement(x,"ebeta.var"));
-    da->mh_p_var = REAL(getListElement(x,"ep.var"))[0];
-    da->mh_phi_var = REAL(getListElement(x,"ephi.var"))[0];
+    da->pbeta_mean = PBM_ELT(x) ;
+    da->pbeta_var = PBV_ELT(x) ;
+    da->mh_beta_var = EBV_ELT(x);
+    da->mh_p_var = EPV_ELT(x)[0];
+    da->mh_phi_var = EPHIV_ELT(x)[0];
     da->bound_p = BDP_ELT(x) ;
-    da->bound_phi = REAL(getListElement(x,"bound.phi"))[0] ;
+    da->bound_phi = BDPHI_ELT(x)[0] ;
     
     // update eta and mu
     cpglm_fitted(da->eta, da->mu, (double*) NULL, dap) ;
 
     // tune the scale parameter for M-H update    
     if (tn){
+        int etn = ceil(tn *1.0/ntn) ;  // # iters per tuning loop
+        double *beta_sims = dvect(etn*nB), *p_sims = dvect(etn),
+            *phi_sims = dvect(etn), sam_p_var, sam_phi_var,
+            *sam_beta_var = dvect(nB*nB) ;
+        sims = dmatrix(etn,nB+2) ;
+    
         if (nR>0)
             Rprintf("Tuning phase...\n");
-        int etn = ceil(tn *1.0/ntn) ;  // # iters per tuning loop
-        sims = dmatrix(etn,nB+2) ;
-        double *beta_sims = dvect(etn*nB) ;
-        double m_p =0,  sam_p_var=0;
-        double m_phi =0,  sam_phi_var=0;
-        double *sam_beta_var = dvect(nB*nB) ;
-
+    
         for (k=0;k<ntn;k++) {
             bcpglm_mcmc_lat(da,  0, etn, 0, 1, sims, acc_pct);
+            // convert to long vector
+            for (i=0;i<etn;i++){   
+                p_sims[i] = sims[i][nB+1] ;
+                phi_sims[i] = sims[i][nB] ;
+                for (j=0;j<nB;j++)
+                    beta_sims[i+j*etn] = sims[i][j] ; 
+            }
             // adjust proposal variance for p and phi
-            for (i=0;i<etn;i++){   // compute sample mean
-                m_p += sims[i][nB+1] ;
-                m_phi += sims[i][nB] ;
-            }
-            m_p /= etn ;
-            m_phi /= etn ;
-            for (i=0;i<etn;i++){   // compute sample covariance 
-                sam_p_var += (sims[i][nB+1]-m_p)*(sims[i][nB+1]-m_p);
-                sam_phi_var += (sims[i][nB]-m_phi)*(sims[i][nB]-m_phi);
-            }
-            sam_p_var /= etn-1 ;
-            sam_phi_var /= etn-1 ;
-            // adjust proposal covariance if accept percentage is too low or too high
+            cov(etn,1,p_sims, &sam_p_var) ;
+            cov(etn,1,phi_sims, &sam_phi_var) ;        
             if (acc_pct[0]<0.4 || acc_pct[0] > 0.6)
                 da->mh_p_var = tnw * da->mh_p_var + (1-tnw) * sam_p_var  ;
             if (acc_pct[2]<0.4 || acc_pct[2] > 0.6)
                 da->mh_phi_var = tnw * da->mh_phi_var + (1-tnw) * sam_phi_var  ;
 
-            // adjust vcov for beta            
-            // compute sample vcov matrix
-            for (i=0;i<etn;i++){
-                for (j=0;j<nB;j++)
-                    beta_sims[i+j*etn] = sims[i][j] ; // convert to long vector
-            }
-            cplm_cov(etn, nB, beta_sims, sam_beta_var) ;
-            // adjust scale 
+            // adjust vcov for beta
+            cov(etn, nB, beta_sims, sam_beta_var) ;
             if (acc_pct[1]<0.15 || acc_pct[1] > 0.35){
                 for (i=0;i<nB*nB;i++)
                     da->mh_beta_var[i] = tnw * da->mh_beta_var[i] + (1-tnw) * sam_beta_var[i];
             }
-        }
+        }   
         if (nR>0){
             Rprintf("Acceptance rate in the last tuning phase:  beta(%4.2f%%), phi(%4.2f%%), p(%4.2f%%)\n",
                     acc_pct[1]*100, acc_pct[2]*100, acc_pct[0]*100);
             Rprintf("-----------------------------------------\n");
         }
-     }
+    }
+
     // run Markov chains
     PROTECT(ans=allocVector(VECSXP,dm[chn_POS])) ;
     if (nR>0){

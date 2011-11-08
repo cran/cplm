@@ -28,6 +28,22 @@
 /** zero an array */
 #define AZERO(x, n) {int _I_, _SZ_ = (n); for(_I_ = 0; _I_ < _SZ_; _I_++) (x)[_I_] = 0;}
 
+/* When appropriate, alloca is cleaner than malloc/free.  The storage
+ * is freed automatically on return from a function. When using gcc the
+ * builtin version is much faster. */
+#ifdef __GNUC__
+# undef alloca
+# define alloca(x) __builtin_alloca((x))
+#else
+/* this is necessary (and sufficient) for Solaris 10: */
+# ifdef __sun
+#  include <alloca.h>
+# endif
+#endif
+
+/** alloca n elements of type t */
+#define Alloca(n, t)   (t *) alloca( (size_t) ( (n) * sizeof(t) ) )
+
 
 #ifndef DA_PARM_STRUCT 
 #define DA_PARM_STRUCT
@@ -65,6 +81,9 @@ enum dimB {
     nO_POS=0,			/**<number of observations */
     nB_POS,			/**<number of coefficients */
     nP_POS,			/**<number of positive obs */
+    nT_POS,                     /**<number of terms in cpglmm */
+    nU_POS,                     /**<number of random coefficients */
+    nA_POS,                     /**<number of parameters in the variance components */
     chn_POS,			/**<number of chains */
     itr_POS,			/**<number of iterations */
     bun_POS,			/**<number of burn-in */
@@ -103,6 +122,10 @@ static R_INLINE double *ELT_REAL_NULL(SEXP obj, char *str)
 /** Return the double pointer to the y slot */
 #define Y_ELT(x) ELT_REAL_NULL(x, "y")
 
+/** Allocate (alloca) a cholmod_sparse struct, populate it with values
+ * from the Zt slot and return the pointer. */
+#define Zt_ELT(x) AS_CHM_SP(getListElement(x, "Zt"))
+
 /** Return the double pointer to the offset slot or (double*) NULL if
  * offset has length 0) */
 #define OFFSET_ELT(x) ELT_REAL_NULL(x, "offset")
@@ -120,6 +143,9 @@ static R_INLINE double *ELT_REAL_NULL(SEXP obj, char *str)
 
 /** Return the double pointer to the fixef slot */
 #define BETA_ELT(x) ELT_REAL_NULL(x, "beta")
+
+/** Return the double pointer to the ranef slot */
+#define U_ELT(x) ELT_REAL_NULL(x, "u")
 
 /** Return the double pointer to the eta slot */
 #define ETA_ELT(x) ELT_REAL_NULL(x, "eta")
@@ -150,9 +176,51 @@ static R_INLINE double *ELT_REAL_NULL(SEXP obj, char *str)
  *  sqrtXWt has length 0) */
 #define LKP_ELT(x) ELT_REAL_NULL(x, "link.power")
 
-/** Return the double pointer to the bound_p slot  */
+/** Return the double pointer to the bound.p slot  */
 #define BDP_ELT(x) ELT_REAL_NULL(x,"bound.p")
 
+/** Return the double pointer to the bound.phi slot  */
+#define BDPHI_ELT(x) ELT_REAL_NULL(x,"bound.phi")
+
+/** Return the double pointer to the pbeta.mean slot  */
+#define PBM_ELT(x) ELT_REAL_NULL(x,"pbeta.mean")
+
+/** Return the double pointer to the pbeta.var slot  */
+#define PBV_ELT(x) ELT_REAL_NULL(x,"pbeta.var")
+
+/** Return the integer pointer to the Gp slot or (double*) NULL if
+ * Gp has length 0) */
+#define Gp_ELT(x) INTEGER(getListElement(x, "Gp"))
+
+/** Return the double pointer to the ebeta.var slot  */
+#define EBV_ELT(x) ELT_REAL_NULL(x,"ebeta.var")
+
+/** Return the double pointer to the eu.var slot  */
+#define EUV_ELT(x) ELT_REAL_NULL(x,"eu.var")
+
+/** Return the double pointer to the ephi.var slot  */
+#define EPHIV_ELT(x) ELT_REAL_NULL(x,"ephi.var")
+
+/** Return the double pointer to the ep.var slot  */
+#define EPV_ELT(x) ELT_REAL_NULL(x,"ep.var")
+
+/** Return the integer pointer to the ncol slot  */
+#define NCOL_ELT(x) INTEGER(getListElement(x, "ncol"))
+
+/** Return the integer pointer to the nlev slot */
+#define NLEV_ELT(x) INTEGER(getListElement(x, "nlev"))
+
+/** Return the double pointer to the igamma.shape slot  */
+#define IGSHP_ELT(x) ELT_REAL_NULL(x,"igamma.shape")
+
+/** Return the double pointer to the igamma.scale slot  */
+#define IGSCL_ELT(x) ELT_REAL_NULL(x,"igamma.scale")
+
+/** Return the double pointer to the iwish.scale slot  */
+#define IWSCL_ELT(x) ELT_REAL_NULL(x,"iwish.scale")
+
+/** Return the double pointer to the iwish.df slot  */
+#define IWDF_ELT(x) ELT_REAL_NULL(x,"iwish.df")
 
 
 // memory allocation utilities
@@ -168,7 +236,9 @@ double dcumwsum(double *x, double *w, int n) ;
 double icumwsum(int *x, double *w, int n) ;
 double norm (double *x, int n);
 double dist (double *x, double *y, int n);
-
+double dmax (double *x, int n) ;
+int imax (int *x, int n) ;
+    
 // univariate optimization 
 void lbfgsbU(double *x, double lower, double upper, double *val,
              optimfn fn, optimgr gr, void *ex,  int *conv) ;
@@ -179,8 +249,8 @@ double linkFun(double mu, double link_power);
 double linkInv(double eta, double link_power);
 double mu_eta(double eta, double link_power) ;
 
-void cplm_eta(double *eta, int nO, int nB, double *X,
-              double *beta, double *b, double *offset);       
+void cpglm_eta(double *eta, int nO, int nB, double *X,
+              double *beta,  double *offset);       
 void cplm_mu_eta(double* mu, double* muEta, int n, double* eta, 
 		   double link_power);
 void cplm_varFun(double* var, double* mu, int n, double p);
@@ -212,11 +282,14 @@ int metrop_mvnorm_rw(int d, double *m, double *v, double *sn,
 int metrop_tnorm_rw( double m, double sd, double lb, double rb, double *sn, 
 		     double (*myfunc)(double x, void *data), 
 		     void *data) ;
-void cplm_cov(int n, int p, double *x, double *ans) ;
-
+void cov(int n, int p, double *x, double *ans) ;
+void solve_po(int d, double *v, double *iv) ;
+void mult_xtx(int m, int n, double *x, double *out) ;
+double dmvnorm(int d, double *x, double *m, double *iv) ;
 
 // tweedie 
 double dtweedie(double y, double mu,
                  double phi, double p);
 double dl2tweedie(int n, double *y, double *mu,
                   double phi, double p) ;
+void rwishart(int d, double nu, double *scal, double *out) ;

@@ -16,13 +16,13 @@ bcpglm(formula, link = "log", data, inits = NULL,
   bound.phi=100, bound.p = c(1.01, 1.99),method="dtweedie", 
   tune.iter=4000, n.tune=10, tune.weight=0.25,...)
 }
-%- maybe also 'usage' for other objects documented here.
+
 \arguments{
  \item{formula}{an object of class \code{formula}. See also in \code{\link[stats]{glm}}.
 }
   \item{link}{a specification for the model link function. This can be either a literal character string or a numeric number. If it is a character string, it must be one of "log", "identity", "sqrt" or "inverse". If it is numeric, it is the same as the \code{link.power} argument in the \code{\link[statmod]{tweedie}} function. The default is \code{link="log"}.
 }
- \item{inits}{a list of initial values to be used for each chain. It must be of length \code{n.chains}. For each element, the last two values are for the dispersion and the index parameters, respectively. If not supplied, the function will generate initial values automatically, which are based on a GLM with the supplied model structure. 
+ \item{inits}{a list of initial values to be used for each chain. It must be of length \code{n.chains}. For each element, it is a named list with three components 'beta', 'phi' and 'p'. If not supplied, the function will generate initial values automatically, which are based on a GLM with the supplied model structure. 
 }
   \item{weights}{an optional vector of weights. Should be \code{NULL} or a numeric vector. When it is numeric, it must be positive. Zero weights are not allowed in \code{bcpglm}. 
 }
@@ -95,7 +95,7 @@ The simulated values of all model parameters are stored in the slot \code{sims.l
 }
 
 \value{
-  \code{bcpglm} returns an object of class \code{"bcpglm"}. See \code{\link{bcplm-class}} for details of the return values as well as various methods available for this class.
+  \code{bcpglm} returns an object of class \code{"bcpglm"}. See \code{\link{bcpglm-class}} for details of the return values as well as various methods available for this class.
 }
 
 

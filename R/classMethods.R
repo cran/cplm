@@ -6,41 +6,47 @@
 # virtual classes used in other class definitions
 setClassUnion("NullNum",c("NULL","numeric"))
 setClassUnion("NullList",c("NULL","list"))  
-setClassUnion("NullFunc",c("NULL","function"))
+setClassUnion("NullFunc",c("NULL","function"))  
 
 # import from package coda
 setOldClass(c("mcmc","mcmc.list","summary.mcmc"))
 
+# class defining slots common to all derived classes 
+setClass("cplm", 
+  representation(
+    call="call",
+    formula="formula",
+    contrasts="NullList",
+    link.power="numeric",
+    model.frame = "data.frame",
+    inits="NullList")
+)
+
 # class of "cpglm", returned by a call to "cpglm" 
 setClass("cpglm", 
- representation(
-  coefficients="numeric",
-  residuals="numeric",
-  fitted.values="numeric",
-  linear.predictors="numeric",
-  weights="numeric",
-  df.residual="integer",
-  deviance="numeric",
-  aic="numeric",
-  offset="NullNum",
-  prior.weights="NullNum",
-  call="call",
-  formula="formula",
-  data="data.frame",
-  control="list",
-  contrasts="NullList",
-  theta="numeric",
-  theta.all="matrix",
-  p="numeric",
-  phi="numeric",
-  vcov="matrix",
-  iter="integer",
-  converged="logical",
-  method="character",
-  y="numeric",
-  link.power="numeric",
-  na.action="NullFunc",
-  model.frame="data.frame")
+  representation(
+    coefficients="numeric",
+    residuals="numeric",
+    fitted.values="numeric",
+    linear.predictors="numeric",
+    y = "numeric",
+    offset = "NullNum",
+    prior.weights = "NullNum",
+    weights="numeric",
+    df.residual="integer",
+    deviance="numeric",
+    aic="numeric",
+    control="list",
+    theta="numeric",
+    theta.all="matrix",
+    p="numeric",
+    phi="numeric",
+    vcov="matrix",
+    iter="integer",
+    converged="logical",
+    method="character",
+    na.action="NullFunc"),
+    contains = "cplm"
 )
 
 # class "cpglmm" returned from a call of cpglmm
@@ -48,9 +54,8 @@ setClass("cpglmm",
  representation(
   p="numeric", 
   phi="numeric",
-  link.power="numeric", 
   bound.p="numeric"),
-  contains = "mer"
+  contains = c("mer","cplm")
 )
 
 # class "summary.cpglmm" 
@@ -64,63 +69,59 @@ setClass("summary.cpglmm",
     vcov = "dpoMatrix",
     REmat = "matrix",
     AICtab= "data.frame"),
-    contains = "cpglmm")
-
-
-# class of "bcplm", base class used in all Bayesian models 
-setClass("bcplm", 
- representation( 
-  n.chains="integer",
-  n.iter="integer", 
-  n.burnin="integer",
-  n.thin="integer", 
-  n.sims="integer",  
-  sims.list="mcmc.list",
-  link.power="numeric",
-  model.frame = "data.frame",
-  call="call",
-  formula="formula",
-  data="data.frame",
-  contrasts="NullList",
-  inits="list")
-)             
+  contains = "cpglmm")
 
 # class of "bcpglm", returned from a call to "bcpglm"
-setClass("bcpglm", contains="bcplm")             
+setClass("bcpglm", 
+  representation(
+    n.chains="integer",
+    n.iter="integer", 
+    n.burnin="integer",
+    n.thin="integer", 
+    n.sims="integer",  
+    sims.list="mcmc.list"),
+  contains="cplm")
 
+# class of "bcpglmm", returned from a call to "bcpglmm"
+setClass("bcpglmm", 
+  representation(
+    Zt = "dgCMatrix",
+    flist = "list"),
+  contains="bcpglm")
+         
 ################################################
-# methods defined for cpglm 
+# methods defined for cplm 
 ################################################
 
 # extraction of slots using $
 setMethod("$",
-    signature(x = "cpglm"),
+    signature(x = "cplm"),
     function (x, name) 
         slot(x,name)
 )
 
 # names to get slot names
 setMethod("names",
-    signature(x = "cpglm"),
+    signature(x = "cplm"),
     function (x) 
         return(slotNames(x))
 )
 
 # extraction of slots using "[["
 setMethod("[[",
-    signature(x = "cpglm",i="numeric",j="missing"),
+    signature(x = "cplm",i="numeric",j="missing"),
     function (x, i, j, ...) 
 	    return(slot(x,names(x)[i]))
 )
 
 setMethod("[[",
-    signature(x = "cpglm",i="character",j="missing"),
+    signature(x = "cplm",i="character",j="missing"),
     function (x, i, j, ...) 
       return(slot(x,i))
 )
 
 setMethod("[",
-    signature(x = "cpglm",i="numeric",j="missing",drop="missing"),
+    signature(x = "cplm",i="numeric",j="missing",drop="missing"),
     function (x, i, j, ..., drop) {
       output <- lapply(i, function(y) slot(x,names(x)[y]))
         names(output) <- names(x)[i]
@@ -129,7 +130,7 @@ setMethod("[",
 )
 
 setMethod("[",
-    signature(x = "cpglm",i="character",j="missing",drop="missing"),
+    signature(x = "cplm",i="character",j="missing",drop="missing"),
     function (x, i, j, ..., drop) {
       output <- lapply(1:length(i), function(y) slot(x,i[y]))
       names(output) <- i
@@ -137,6 +138,34 @@ setMethod("[",
     }
 )
 
+setMethod("terms",
+    signature(x = "cplm"),
+    function (x,...) 
+      attr(x@model.frame,"terms")
+)
+
+setMethod("model.matrix",
+    signature(object = "cplm"),
+    function (object,...) 
+      model.matrix(terms(object), 
+            object@model.frame, object@contrasts)
+)
+
+setMethod("formula",
+    signature(x = "cplm"),
+    function (x,...) 
+     x@formula
+)         
+
+setMethod("show",signature(object = "cplm"),
+  function(object)
+    summary(object)                                                    
+)
+
+################################################
+# methods defined for cpglm 
+################################################
+         
 setMethod("coef",
           signature(object = "cpglm"),
     function (object,...) 
@@ -173,8 +202,9 @@ setMethod("residuals",
       working = r, 
       response = y - mu, 
       partial = r)
-    if (!is.null(object@na.action)) 
-        res <- naresid(object@na.action, res)
+    na.action <- attr(object@model.frame,"na.action")
+    if (!is.null(na.action)) 
+        res <- naresid(na.action, res)
     #if (type == "partial") 
     #    res <- res + predict(object, type = "terms")
     res
@@ -222,24 +252,6 @@ setMethod("deviance",
       object@deviance
 )
 
-setMethod("terms",
-    signature(x = "cpglm"),
-    function (x,...) 
-      attr(x@model.frame,"terms")
-)
-
-setMethod("model.matrix",
-    signature(object = "cpglm"),
-    function (object,...) 
-      model.matrix(terms(object), 
-            object@model.frame, object@contrasts)
-)
-
-setMethod("formula",
-    signature(x = "cpglm"),
-    function (x,...) 
-     x@formula
-)
 
 setMethod("summary", signature(object="cpglm"),
 	function(object,...){
@@ -260,7 +272,7 @@ setMethod("summary", signature(object="cpglm"),
                         profile=c("t value", "Pr(>|t|)"))
     dimnames(coef.table) <- list(names(coef.beta), c(dn, dn2))
     keep <- match(c("call", "deviance", "aic", "contrasts", "df.residual","method",  
-        "iter", "na.action"), names(object), 0L)  
+        "iter","na.action"), names(object), 0L)  
     ans <- c(object[keep], list(deviance.resid = residuals(object, 
         type = "deviance"), coefficients = coef.table, 
         dispersion = object@phi, vcov=object@vcov, p=object@p))    
@@ -301,101 +313,25 @@ setMethod("summary", signature(object="cpglm"),
     invisible(x)
 }
     
-setMethod("show",signature(object = "cpglm"),
-  function(object)
-    summary(object)                                                    
-)     
 
 
 
 ################################################
-# methods defined for bcplm
+# methods defined for bcpglm
 ################################################
 
-# extraction of slots using $
-setMethod("$",
-    signature(x = "bcplm"),
-    function (x, name) 
-        slot(x,name)
-)
-
-# names to get slot names
-setMethod("names",
-    signature(x = "bcplm"),
-    function (x) 
-        return(slotNames(x))
-)
-
-# extraction of slots using "[["
-setMethod("[[",
-    signature(x = "bcplm",i="numeric",j="missing"),
-    function (x, i, j, ...) 
-      return(slot(x,names(x)[i]))
-)
-
-setMethod("[[",
-    signature(x = "bcplm",i="character",j="missing"),
-    function (x, i, j, ...) 
-      return(slot(x,i))
-)
-
-setMethod("[",
-    signature(x = "bcplm",i="numeric",j="missing",drop="missing"),
-    function (x, i, j, ..., drop) {
-      output <- lapply(i, function(y) slot(x,names(x)[y]))
-        names(output) <- names(x)[i]
-	    return(output)
-    }
-)
-
-setMethod("[",
-    signature(x = "bcplm",i="character",j="missing",drop="missing"),
-    function (x, i, j, ..., drop) {
-      output <- lapply(1:length(i), function(y) slot(x,i[y]))
-      names(output) <- i
-      return(output)
-    }
-)
-
-setMethod("terms",
-    signature(x = "bcplm"),
-    function (x,...) 
-      attr(x@model.frame,"terms")
-)
-
-setMethod("model.matrix",
-    signature(object = "bcplm"),
-    function (object,...) 
-      model.matrix(terms(object), 
-            object@model.frame, object@contrasts)
-)
-
-setMethod("formula",
-    signature(x = "bcplm"),
-    function (x,...) 
-      x@formula
-)
-
-
-setMethod("summary", signature(object="bcplm"),
+setMethod("summary", signature(object="bcpglm"),
   function(object, quantiles = c(0.025, 0.25, 0.5, 0.75, 0.975),...){
     summary(object@sims.list,quantiles=quantiles)   
   }
 )
 
-
-setMethod("plot", signature(x="bcplm",y="missing"),
+setMethod("plot", signature(x="bcpglm",y="missing"),
   function(x,y,...)
     plot(x@sims.list)
 )
 
-
-setMethod("show",signature(object = "bcplm"),
-  function(object)
-    summary(object)                                                    
-)
-
-
+        
 ################################################
 # methods defined for cpglmm
 ################################################
@@ -525,7 +461,7 @@ print.cpglmm <- function(x, digits = max(3, getOption("digits") - 3),
 		    p <- ncol(corF)
 		    if (p > 1) {
 		      rn <- rownames(so@coefs)
-		      rns <- abbreviate(rn, minlen=11)
+		      rns <- abbreviate(rn, minlength=11)
 		      cat("\nCorrelation of Fixed Effects:\n")
 		      if (is.logical(symbolic.cor) && symbolic.cor) {
 			      corf <- as(corF, "matrix")
@@ -534,7 +470,7 @@ print.cpglmm <- function(x, digits = max(3, getOption("digits") - 3),
 			      print(symnum(corf))
 		      } else {
 			      corf <- matrix(format(round(corF@x, 3), nsmall = 3),
-				       nc = p,dimnames = list(rns, abbreviate(rn, minlen=6)))
+				       ncol = p,dimnames = list(rns, abbreviate(rn, minlength=6)))
 			      corf[!lower.tri(corf)] <- ""
 			      print(corf[-1, -p, drop=FALSE], quote = FALSE)
 		      }

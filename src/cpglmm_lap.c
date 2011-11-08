@@ -24,35 +24,8 @@
 #include "Matrix.h"		 /* for cholmod functions */
 
 
-/* When appropriate, alloca is cleaner than malloc/free.  The storage
- * is freed automatically on return from a function. When using gcc the
- * builtin version is much faster. */
-#ifdef __GNUC__
-# undef alloca
-# define alloca(x) __builtin_alloca((x))
-#else
-/* this is necessary (and sufficient) for Solaris 10: */
-# ifdef __sun
-#  include <alloca.h>
-# endif
-#endif
-
 /** cholmod_common struct initialized  */
 extern cholmod_common c;
-
-/*
- * initiate cholmod and set the factorization form to be LL'
- */
-/*
-SEXP init(){
-M_R_cholmod_start(&c);
-    c.final_ll = 1;
-    return R_NilValue ;
-    }*/
-
-/** alloca n elements of type t */
-#define Alloca(n, t)   (t *) alloca( (size_t) ( (n) * sizeof(t) ) )
-
 
 /* Constants */
 
@@ -642,61 +615,26 @@ ST_setPars(SEXP x, const double *pars)
     update_A(x);
 }
 
-
-/**
- * Compute -2*logliklihood from of a cplm object. 
- *
- * @param x a cplm object
- * @param fun a R function that evaluates the -2*logliklihood of
- * the tweedie compound poisson distribution. The function takes a list
- * object as its argument, where the componnents of the list are y, mu,
- * phi and p, respectively. The corresponding envirionment is stores in x.
- *
- * @return -2 *logliklihood
- *
- */
-static double ldtweedie(SEXP x, SEXP fun ){
-  SEXP R_fcall, arg ;
-  double ans=0 ;
- 
-  PROTECT(R_fcall = lang2(fun, R_NilValue));
-  PROTECT(arg = allocVector(VECSXP,4)) ;
-  
-  // fill the argument list
-  SET_VECTOR_ELT(arg,0, GET_SLOT(x,install("y"))) ;
-  SET_VECTOR_ELT(arg,1, GET_SLOT(x,install("mu"))) ;
-  SET_VECTOR_ELT(arg,2, GET_SLOT(x,install("phi"))) ;
-  SET_VECTOR_ELT(arg,3, GET_SLOT(x,install("p"))) ;
-  
-  // set argument and evaluate
-  SETCADR(R_fcall, arg) ;
-  ans = REAL(eval(R_fcall, GET_SLOT(x,install("env"))))[0];
-  UNPROTECT(2) ;
-  return ans ;
-
-}
-
 /**
  * Compute twice negative marginal logliklihood to be used in optimization. 
  * This is different from that in lme4, so I added the prefix "cp".
  *
  * @param x a cplm object
- * @param fun a R function that evaluates the -2*logliklihood of
- * the tweedie compound poisson distribution. The function takes a list
- * object as its argument, where the componnents of the list are y, mu,
- * phi and p, respectively. The corresponding envirionment is stores in x.
  *
  * @return twice negative marginal logliklihood
  *
  */
-static double cp_update_dev(SEXP x, SEXP fun)
+static double cp_update_dev(SEXP x)
 {
+    int n = DIMS_SLOT(x)[n_POS];
+    double *d = DEV_SLOT(x), *y = Y_SLOT(x),
+        *mu = MU_SLOT(x), *phi=PHI_SLOT(x),
+        *p = P_SLOT(x), ans ;
 
-    double *d = DEV_SLOT(x),  ans ;
     // find conditional mode
     cp_update_u(x);
-    d[ML_POS] = d[ldL2_POS];   //variance of u
-    ans = ldtweedie(x, fun);
+    d[ML_POS] = d[ldL2_POS];   //variance of u    
+    ans = dl2tweedie(n, y, mu, *phi, *p) ;
     d[disc_POS] = ans;
     d[ML_POS] += d[disc_POS] + d[usqr_POS]; 
     return d[ML_POS];
@@ -716,7 +654,7 @@ static double cp_update_dev(SEXP x, SEXP fun)
  *
  * @return R_NilValue
  */
-SEXP cpglmm_optimize(SEXP x, SEXP fun)
+SEXP cpglmm_optimize(SEXP x)
 {
     SEXP ST = GET_SLOT(x, install("ST"));
     int *dims = DIMS_SLOT(x);
@@ -766,7 +704,7 @@ SEXP cpglmm_optimize(SEXP x, SEXP fun)
 	ST_setPars(x, xv);	/* update ST and A etc. */
         PHI_SLOT(x)[0]= exp(xv[nv1]) ;
         P_SLOT(x)[0]= xv[nv1+1] ;       
-	fx = cp_update_dev(x, fun);        
+	fx = cp_update_dev(x);        
 	S_nlminb_iterate(b, d, fx, g, h, iv, liv, lv, nv, v, xv);
     } while (iv[0] == 1 || iv[0] == 2);
     ST_setPars(x, xv);
@@ -806,11 +744,10 @@ SEXP cpglmm_update_u(SEXP x){
  * R callable function to update deviance
  *
  * @param x a R list object
- * @param fun pointer to the R ldtweedie function
  *
  * @return twice negative loglikelihood
 */
-SEXP cpglmm_update_dev(SEXP x, SEXP fun){
-    return ScalarReal(cp_update_dev(x, fun));
+SEXP cpglmm_update_dev(SEXP x){
+    return ScalarReal(cp_update_dev(x));
 }
 

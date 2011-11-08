@@ -8,8 +8,8 @@ This function fits compound Poisson generalized linear mixed models using Laplac
 }
 \usage{
 cpglmm(formula, link = "log", data, weights, offset, subset, 
-    na.action, betastart = NULL, phistart = NULL, pstart = NULL, 
-    contrasts = NULL, control = list())
+    na.action, inits = NULL,  contrasts = NULL, 
+    control = list())
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -22,12 +22,9 @@ cpglmm(formula, link = "log", data, weights, offset, subset,
  
   \item{subset, weights, na.action, offset, contrasts}{further model specification arguments as in \code{\link[stats]{glm}}; see there for details.}
   
-\item{betastart}{starting values for the vector of mean parameters.
+\item{inits}{a named list with three components 'beta', 'phi' and 'p' that supply the initital values used in the optimization. If not supplied, the function will generate initial values automatically, which are based on a GLM with the supplied model structure.
 }
-  \item{phistart}{starting value for the dispersion (scale) parameter.
-}
-  \item{pstart}{starting value for the index parameter. Must be between 1 and 2. When \code{bound.p} is specified, \code{pstart} must be between the bounds set there.
-}  
+
   \item{control}{
 a list of parameters for controlling the fitting process. See 'Details' below. 
 }
@@ -40,7 +37,7 @@ Specifically, \code{cpglmm} fits compound Poisson generalized linear mixed model
 
 
 
-The \code{control} argument is a list that can supply various controlling elements used in the fitting process. Most of these elements are used in the MCEM algorithm, and those used in the profile likelihood approach are explicitly identified in the following:
+The \code{control} argument is a list that can supply various controlling elements used in the fitting process:
 
 \describe{
 \item{\code{max.iter}}{maximum number of iterations allowed in the algorithm. The default value is 300.}

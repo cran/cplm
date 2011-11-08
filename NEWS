@@ -1,4 +1,20 @@
 ================
+Version 0.4-1
+================
+NEW FEATURES
+
+   o Function 'bcpglmm' is added that handles Bayesian mixed-effect models 
+	using MCMC simulations.
+
+CHANGES:
+   (user-visible)	
+   o create the class 'cplm' as a fundamental structure in the package, 
+	and define utility methods for it
+   o replace the 'pstart', 'phistart' and 'betastart' arguments by a single
+	argument 'inits' in most functions
+   o combine the documentation for all classes and methods 
+
+================
 Version 0.3-1
 ================
 NEW FEATURES

@@ -13,6 +13,11 @@
 
 #include "cplm.h"
 
+
+/************************************************************/
+/*          Memory allocation utility functions             */
+/************************************************************/
+
 /**
  * allocate memory for a double vector of size n
  *
@@ -71,6 +76,10 @@ int ** imatrix(int nr, int nc)
 	m[i] = (int*) R_alloc(nc, sizeof(int));
     return m;
 }
+
+/************************************************************/
+/*               Simple arithmetic utility                  */
+/************************************************************/
 
 /**
  * cumulative sum of a vector of double 
@@ -139,6 +148,165 @@ double icumwsum(int *x, double *w, int n){
     return sm ;
 }
 
+
+/**
+ * take the norm of a vector
+ *
+ * @param x a double vector
+ * @param n length of the vector
+ *
+ * @return norm of the vector
+ */
+double norm (double *x, int n){
+    int i ;
+    double nm=0 ;
+    for (i=0;i<n;i++)
+        nm += x[i] * x[i] ;
+    return sqrt(nm) ;
+}
+
+
+/**
+ * norm distance between two vectors
+ *
+ * @param x a double vector
+ * @param y a double vector
+ * @param n length of the vector
+ *
+ * @return norm distance of the two vectors
+ */
+double dist (double *x, double *y, int n){
+    int i ;
+    double nm=0 ;
+    for (i=0;i<n;i++)
+        nm += (x[i] - y[i])*(x[i] - y[i]) ;
+    return sqrt(nm) ;
+}
+
+/**
+ * get the max value of a double vector
+ *
+ * @param x a double vector
+ * @param n length of the vector
+ *
+ * @return max value
+ */
+double dmax (double *x, int n){
+    double ans = x[0] ;
+    if (n>1){
+        for (int i=1; i<n; i++)
+            if (x[i]>ans) ans = x[i] ; 
+    }
+    return ans ;
+}
+
+/**
+ * get the max value of an int vector
+ *
+ * @param x an int vector
+ * @param n length of the vector
+ *
+ * @return max value
+ */
+int imax (int *x, int n){
+    int ans = x[0] ;
+    if (n>1){
+        for (int i=1; i<n; i++)
+            if (x[i]>ans) ans = x[i] ; 
+    }
+    return ans ;
+}
+
+
+/************************************************************/
+/*                 Matrix computations                      */
+/************************************************************/
+
+
+/**
+ * Multiply a matrix and a vector 
+ *
+ * @param trans transpose of matrix?
+ * @param m row count of matrix
+ * @param n column count of matrix
+ * @param A input matrix
+ * @param x input vector
+ * @param out output vector 
+ *
+ */
+void mult_mv(char *trans, int m, int n, double *A,
+             double *x, double *out){
+    double one = 1, zero = 0 ;
+    int incx = 1;
+    F77_CALL(dgemv)(trans, &m, &n, &one, A, &m, x, &incx,
+                    &zero, out, &incx) ;
+}
+
+
+/**
+ * compute t(x) * x
+ *
+ * @param m row dimension of the matrix
+ * @param n column dimension of the matrix
+ * @param x the input matrix  
+ * @param out output results
+ *
+ */
+
+void mult_xtx(int m, int n, double *x, double *out){
+    double alpha=1.0, beta=0,
+        *x2 = Calloc(m*n,double);
+    Memcpy(x2, x, m*n) ;
+    F77_CALL(dgemm)("T", "N", &n, &n, &m, &alpha, x2, &m,
+                    x, &m, &beta, out, &n) ;
+    Free(x2) ;
+}
+
+/**
+ * compute the lower cholesky factor
+ *
+ * @param d dimension of the matrix
+ * @param v input matrix
+ * @param iv output cholesky factor
+ *
+ */
+void chol(int d, double *v, double *iv){    
+    int info;
+    // cholesky factor of v
+    Memcpy(iv, v, d*d) ;   
+    F77_CALL(dpotrf)("L",&d,iv,&d,&info) ;
+    if (info!=0) 
+        error(_("Error %d in Cholesky decomposition."), info) ;   
+}
+
+/**
+ * invert a positive symmetric matrix 
+ *
+ * @param d dimension of the matrix
+ * @param v input matrix
+ * @param iv output inverse of the matrix
+ *
+ */
+void solve_po(int d, double *v, double *iv){    
+    int info, i, j;
+    // cholesky factor of v
+    chol(d, v, iv) ;
+    // compute inverse    
+    F77_CALL(dpotri)("L",&d,iv,&d,&info) ;    
+    if (info!=0) 
+        error(_("Error %d in inverting matrix."), info) ;
+    // fill upper triangle 
+    for (i=0;i<d-1;i++){
+        for (j=i+1;j<d;j++)
+            iv[j*d+i] = iv[i*d+j] ;
+    }    
+}
+
+
+
+/************************************************************/
+/*               Optimization utility function              */
+/************************************************************/
 
 /**
  * optimation using the lbfgsb algorithm. This is a modification
@@ -281,40 +449,10 @@ SEXP getListElement (SEXP list, char *str)
 }
 
 
-/**
- * take the norm of a vector
- *
- * @param x a double vector
- * @param n length of the vector
- *
- * @return norm of the vector
- */
-double norm (double *x, int n){
-    int i ;
-    double nm=0 ;
-    for (i=0;i<n;i++)
-        nm += x[i] * x[i] ;
-    return sqrt(nm) ;
-}
 
-
-/**
- * norm distance between two vectors
- *
- * @param x a double vector
- * @param y a double vector
- * @param n length of the vector
- *
- * @return norm distance of the two vectors
- */
-double dist (double *x, double *y, int n){
-    int i ;
-    double nm=0 ;
-    for (i=0;i<n;i++)
-        nm += (x[i] - y[i])*(x[i] - y[i]) ;
-    return sqrt(nm) ;
-}
-
+/************************************************************/
+/*              cplm intermediate stats update              */
+/************************************************************/
 
 /**
  * compute variance function 
@@ -327,7 +465,6 @@ double dist (double *x, double *y, int n){
 double varFun (double mu, double p){
     return pow(mu,p) ;
 }
-
 
 
 /**
@@ -402,25 +539,15 @@ double mu_eta(double eta, double link_power){
  * @param nB number of coefficients
  * @param X pointer to the design matrix (in long vector representation)
  * @param beta pointer to the vector of coefficients
- * @param b pointer to the vector of random effects (unnormalized)
  * @param offset pointer to the vector of offsets
  */   
 
-void cplm_eta(double *eta, int nO, int nB, double *X, 
-              double *beta, double *b, double *offset){    
-    double one= 1.0 ;
-    int inc = 1, i;
-    // initialize eta
-    if (b==NULL) {
-        AZERO(eta, nO) ;
-    }
-    else {
-        Memcpy(eta, b, nO) ;
-    }
-    // eta = X %*% beta + b
-    F77_CALL(dgemv)("N",&nO,&nB,&one,X,&nO,beta,&inc,&one,eta,&inc) ;
+void cpglm_eta(double *eta, int nO, int nB, double *X, 
+              double *beta,  double *offset){    
+    // eta = X %*% beta
+    mult_mv("N", nO, nB, X, beta, eta) ;
     // eta = eta + offset
-    for (i=0;i<nO;i++)
+    for (int i=0;i<nO;i++)
         eta[i] += offset[i] ;
 }
 
@@ -456,10 +583,11 @@ void cplm_mu_eta(double *mu, double* muEta, int nO,
 
 void cpglm_fitted(double *eta, double *mu, double *muEta,
                  da_parm *dap){
-    cplm_eta(eta, dap->nO, dap->nB, dap->X, dap->beta,
-             (double *) NULL, dap->offset) ;
+    cpglm_eta(eta, dap->nO, dap->nB, dap->X, dap->beta,
+             dap->offset) ;
     cplm_mu_eta(mu, muEta, dap->nO, eta, dap->link_power);
 }
+
 
 /**
  * update the power variance function
@@ -477,6 +605,96 @@ void cplm_varFun(double* var, double* mu, int n, double p){
 }
 
 
+/************************************************************/
+/*                Compute sample statistics                 */
+/************************************************************/
+
+/**
+ * Compute sample mean
+ *
+ * @param n number of samples
+ * @param x samples in long vector 
+ *
+ * @return mean 
+ */
+double mean(int n, double *x){
+    return dcumsum(x, n)/n ;
+}
+
+/**
+ * Compute sample variance for a univariate variable
+ *
+ * @param n number of samples
+ * @param x samples in long vector 
+ * @param ans pointer to store computed variance
+ *
+ */
+void cov1(int n, double *x, double *ans){
+    int i;
+    double m = mean(n, x) ;
+    ans[0] = 0;
+    for (i=0;i<n;i++)
+        ans[0] += (x[i]-m)*(x[i]-m);
+    ans[0] /= n - 1.0  ;
+}
+
+/**
+ * Compute sample covariance matrix 
+ *
+ * @param n number of samples
+ * @param p number of variables (columns), p >2
+ * @param x samples in long vector 
+ * @param ans vector to store computed covariance matrix
+ *
+ */
+void cov2(int n, int p, double *x, double *ans){
+    int i;
+    double *one = Calloc(n*n, double),
+        *x2 = Calloc(n*p, double),
+        *x3 = Calloc(n*p, double);
+    double alpha = -1.0/n, beta = 1.0, beta2=0;
+
+    // subtract mean    
+    for (i=0;i<n*n;i++)
+        one[i] = 1.0 ;
+    Memcpy(x2, x, n*p) ;
+    Memcpy(x3, x, n*p); 
+    F77_CALL(dgemm)("N","N",&n,&p,&n, &alpha, one,
+                    &n, x2, &n, &beta, x3, &n);
+    Memcpy(x2, x3, n*p) ;
+    AZERO(ans,p*p) ;
+    
+    // compute covariance 
+    F77_CALL(dgemm)("T","N",&p,&p,&n, &beta, x2,
+                    &n, x3, &n, &beta2, ans, &p);
+    for (i=0;i<p*p;i++)
+        ans[i] /= n-1 ;
+    Free(one) ;
+    Free(x2) ;
+    Free(x3);
+}
+
+/**
+ * Compute sample covariance matrix 
+ *
+ * @param n number of samples
+ * @param p number of variables (columns)
+ * @param x samples in long vector 
+ * @param ans vector to store computed covariance matrix
+ *
+ */
+void cov(int n, int p, double *x, double *ans){
+    if (p==1)
+        cov1(n, x, ans) ;
+    else
+        cov2(n, p, x, ans) ;
+}
+
+
+
+/************************************************************/
+/*     Distribution and simulation related utilities        */
+/************************************************************/
 
 /**
  * simulation of multivariate normal
@@ -487,26 +705,45 @@ void cplm_varFun(double* var, double* mu, int n, double p){
  * @param s vector to store the simulated values
  *
  */
-// FIXME: does it handle d==1?
 
 void rmvnorm(int d, double *m, double *v, double *s){
-    int i, info, incx=1;
+    int i, incx=1;
     double *lv = Calloc(d*d, double) ;
     GetRNGstate() ;
     // simulate d univariate normal r.v.s
     for (i=0;i<d;i++)
-        s[i] = rnorm(0,1) ;
+        s[i] = rnorm(0,1) ;    
     PutRNGstate() ;    
     // cholesky factor of v
-    Memcpy(lv, v, d*d) ;
-    F77_CALL(dpotrf)("L",&d,lv,&d,&info) ;
-    if (info!=0) 
-        error(_("Error %d in Cholesky decomposition."), info) ;        
+    chol(d, v, lv) ;
     // scale and shift univariate normal r.v.s
     F77_CALL(dtrmv)("L","N","N",&d,lv,&d,s,&incx) ;
     for (i=0;i<d;i++)
         s[i] += m[i] ;    
     Free(lv) ;    
+}
+
+/**
+ * return the exponent of a multivariate normal
+ *
+ * @param d dimension of the matrix
+ * @param x sample vector 
+ * @param m mean vector
+ * @param iv inverse of the covariance matrix 
+ *
+ * @return exponent of MVN
+ */
+double dmvnorm(int d, double *x, double *m, double *iv){
+    int i ;
+    double ep=0, *dx = Alloca(d,double), *tmp = Alloca(d,double) ;
+    R_CheckStack() ;
+    for (i=0;i<d;i++)
+        dx[i] = (m==NULL) ? x[i] : x[i] - m[i];
+    mult_mv("N",d,d,iv,dx,tmp) ;
+    for (i=0;i<d;i++)
+        ep += dx[i]*tmp[i] ;
+    ep *= -0.5 ;
+    return ep ;
 }
 
 /**
@@ -524,15 +761,14 @@ void rmvnorm(int d, double *m, double *v, double *s){
  * @return  a 0-1 integer: 0 means not accept and 1 accept
  *
  */
-
 int metrop_mvnorm_rw(int d, double *m, double *v, double *sn, 
 		     double (*myfunc)(double *x, void *data), 
 		     void *data){
     double A ;
-    rmvnorm(d,m, v, sn) ;
+    rmvnorm(d, m, v, sn) ;
     // determine if accept the sample
     A = exp(myfunc(sn,data)-myfunc(m,data) ) ;
-    if (A<1 && runif(0,1)>=A){ 
+    if (A<1 && runif(0,1)>=A){
         Memcpy(sn, m, d) ;
         return 0 ;
     }
@@ -590,7 +826,6 @@ double cplm_dtnorm(double x, double m, double sd, double lb, double rb){
  *
  * @return  a 0-1 integer: 0 means not accept and 1 accept
  */
-
 int metrop_tnorm_rw( double m, double sd, double lb, double rb, double *sn, 
 		     double (*myfunc)(double x, void *data), 
 		     void *data){
@@ -607,45 +842,8 @@ int metrop_tnorm_rw( double m, double sd, double lb, double rb, double *sn,
     else return 1 ;  
 }
 
-
-
 /**
- * Compute sample covariance matrix 
- *
- * @param n number of samples
- * @param p number of variables (columns)
- * @param x samples in long vector 
- * @param ans vector to store computed covariance matrix
- *
- */
-
- void cplm_cov(int n, int p, double *x, double *ans){
-    int i;
-    double *one = Calloc(n*n, double),
-        *x2 = Calloc(n*p, double),
-        *x3 = Calloc(n*p, double);
-    double alpha = -1.0/n, beta = 1.0, beta2=0;
-
-    // subtract mean    
-    for (i=0;i<n*n;i++)
-        one[i] = 1.0 ;
-    Memcpy(x2, x, n*p) ;
-    Memcpy(x3, x, n*p); 
-    F77_CALL(dgemm)("N","N",&n,&p,&n, &alpha, one, &n, x2, &n, &beta, x3, &n);
-    Memcpy(x2, x3, n*p) ;
-    AZERO(ans,p*p) ;
-    
-    // compute covariance 
-    F77_CALL(dgemm)("T","N",&p,&p,&n, &beta, x2,&n, x3, &n, &beta2, ans, &p);
-    for (i=0;i<p*p;i++)
-        ans[i] /= n-1 ;
-    Free(one) ;
-    Free(x2) ;
-    Free(x3);
-}
-
-/**
- * compute log density for tweeide with positive response
+ * compute log density for tweedie with positive response
  *
  * @param y  response
  * @param mu mean
@@ -655,10 +853,9 @@ int metrop_tnorm_rw( double m, double sd, double lb, double rb, double *sn,
  * @return log density
  */
 
-double dtweedie2(double y, double mu,
+static double dtweedie2(double y, double mu,
                  double phi, double p){
-    double a, a1, logz, drop = 37, jmax, j, cc, wmax,
-        estlogw, oldestlogw;
+    double a, a1, logz, drop = 37, jmax, j, cc, wmax, estlogw;
     double wm = -1.0E16, sum_ww = 0, *ww, ld;
     int k, lo_j, hi_j ;
     
@@ -681,7 +878,6 @@ double dtweedie2(double y, double mu,
     estlogw = wmax ;
     while ((estlogw > (wmax - drop)) && (j >= 2)) {
         j = fmax2(1, j - 2) ;
-        oldestlogw = estlogw ;
         estlogw = j * (cc - a1 * log(j)) ;
     }
     lo_j = imax2(1, floor(j)) ;
@@ -740,4 +936,74 @@ double dl2tweedie(int n, double *y, double *mu,
     ans *= -2 ;
     return ans ;
 
+}
+
+/**
+ * Simulate the Cholesky factor of a standardized Wishart variate with
+ * dimension p and nu degrees of freedom.
+ *
+ * @param nu degrees of freedom
+ * @param p dimension of the Wishart distribution
+ * @param upper if 0 the result is lower triangular, otherwise upper
+                triangular
+ * @param ans array of size p * p to hold the result
+ *
+ * @return ans
+ */
+static double *std_rWishart_factor(double nu, int p, int upper, double ans[])
+{
+    int pp1 = p + 1;
+
+    if (nu < (double) p || p <= 0)
+	error("inconsistent degrees of freedom and dimension");
+
+    AZERO(ans, p * p);
+    for (int j = 0; j < p; j++) {	/* jth column */
+	ans[j * pp1] = sqrt(rchisq(nu - (double) j));
+	for (int i = 0; i < j; i++) {
+	    int uind = i + j * p, /* upper triangle index */
+		lind = j + i * p; /* lower triangle index */
+	    ans[(upper ? uind : lind)] = norm_rand();
+	    ans[(upper ? lind : uind)] = 0;
+	}
+    }
+    return ans;
+}
+
+/**
+ * Simulate a sample of random matrix from a Wishart distribution
+ *
+ * @param d row (=column) dimension of the matrix 
+ * @param nu Degrees of freedom
+ * @param scal Positive-definite scale matrix
+ * @param out simulated matrix (d*d)
+ *
+ */
+void rwishart(int d, double nu, double *scal, double *out)
+{
+    int  info,  psqr;
+    double *scCp, *tmp, one = 1, zero = 0;
+
+    psqr = d*d;
+    tmp = Calloc(psqr, double);
+    scCp = Calloc(psqr, double);
+
+    Memcpy(scCp, scal, psqr);
+    AZERO(tmp, psqr);
+    F77_CALL(dpotrf)("U", &d, scCp, &d, &info);
+    if (info)
+	error(_("scal matrix is not positive-definite"));
+    GetRNGstate();    
+    std_rWishart_factor(nu, d, 1, tmp);
+    F77_CALL(dtrmm)("R", "U", "N", "N", &d, &d,
+			&one, scCp, &d, tmp, &d);
+    F77_CALL(dsyrk)("U", "T", &d, &d, &one, tmp, &d,
+			&zero, out, &d);
+    for (int i = 1; i < d; i++){
+        for (int k = 0; k < i; k++)
+            out[i + k * d] = out[k + i * d];
+    }
+    PutRNGstate();
+    Free(tmp) ;
+    Free(scCp) ;
 }

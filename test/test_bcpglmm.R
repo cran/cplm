@@ -13,35 +13,34 @@ options(error = recover)
 setwd("C:\\Documents and Settings\\CAB2007\\My Documents\\2011\\cplm")
 load("./data/fineroot.RData")
 load("./data/insLoss.RData")
-source("./R/classMethods.R")
-source("./R/cpglm.R")
-source("./R/utilities.R")
-source("./R/bcpglm.R")
+source("R/cpglm.R")
+source("R/cpglmm.R")
+source("R/bcpglmm.R")
+source("R/classMethods.R")
 
 #dyn.load("./src/cplm.so")
 link="log"
 control=list()
 trace=T
 n.chains=3
-n.iter=20
-n.burnin=10
-n.sims=10
+n.iter=5000
+n.burnin=1000
+n.sims=1000
 n.thin=max(1, floor(n.chains * (n.iter - n.burnin) / n.sims))
 n.report=10000
-inits=NULL
 bound.p=c(1.01,1.99)
-phi.shape=0.001
-phi.scale=0.001
+bound.phi=100
+prior.Sigma = NULL
+prior.beta.mean=NULL 
+prior.beta.var=NULL
+inits = NULL
 tune.iter=5000
-n.tune=10
+n.tune=20
 tune.weight=0.25
 
-dyn.load("src/cpglm_bayes.dll")  
 
 
-
-
-bcpglm <- function(formula, link = "log", data, inits = NULL,
+bcpglmm <- function(formula, link = "log", data, inits = NULL,
                    weights, offset, subset, na.action, contrasts = NULL, 
                    n.chains=3, n.iter=2000, n.burnin=floor(n.iter/2),
                    n.thin=max(1, floor(n.chains * (n.iter - n.burnin) / n.sims)),
@@ -49,12 +48,40 @@ bcpglm <- function(formula, link = "log", data, inits = NULL,
                    phi.shape=0.001, phi.scale=0.001, bound.p=c(1.01,1.99),...) {}    
 
 set.seed(10)
+fineroot$a <- rnorm(nrow(fineroot))
+formula <- RLD~ Zone+(1+a|Plant)+(1|Stock) 
+contrasts = NULL
+call <- match.call(bcpglmm,call("bcpglmm", RLD~ Zone+(1+a|Plant)+(1|Stock),data=fineroot))
 
-mf <- match.call(bcpglm,call("bcpglm",increLoss~ factor(year)+factor(lag),
-                             data=insLoss))
+
+dyn.load("src/bcpglmm.dll") 
+a= .Call("init")
 
 
-dyn.load("src/cpglm_bayes.dll")             
+a= .Call("finish")
+dyn.unload("src/bcpglmm.dll")
+
+set.seed(10)
+fit1 <- bcpglmm(RLD~Zone*Stock+(1|Plant), data = fineroot,  
+                   n.chains=3, n.iter=25000, n.burnin=5000,
+                   n.sims=2000, n.report=5000)
+
+fit2 <- cpglmm(RLD~Zone*Stock+(1|Plant), data = fineroot)
+
+
+x=rnorm(10)
+y=rnorm(10)
+z=rnorm(10)
+a=cov(cbind(x,y,z))
+x2= rnorm(3)
+m = rnorm(3)
+solve(a)
+
+xx=cbind(x,y,z)
+a= diag(1,nrow=3)
+b=.Call("inv",m=as.integer(3),n=as.integer(3),x=a)
+
+t(x2-m)%*%solve(a)%*%(x2-m) *(-0.5)
 
 dyn.unload("src/cpglm_bayes.dll")             
 
@@ -90,6 +117,7 @@ fit3 <- bcpglm(increLoss~ factor(year)+factor(lag), data=insLoss,
                n.thin=10, n.report=5000, bound.p=c(1.1,1.95))
 gelman.diag(fit3$sims.list)
 summary(fit3)                             
+
 
 
 

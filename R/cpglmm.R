@@ -4,8 +4,8 @@
 #######################################################
 
 cpglmm <- function(formula, link="log", data, weights, offset,
-                  subset, na.action, betastart=NULL, phistart=NULL, 
-                  pstart=NULL, contrasts = NULL, control = list()) {
+                  subset, na.action, inits=NULL, 
+                  contrasts = NULL, control = list()) {
     
   call <- match.call()  
   if (missing(data)) 
@@ -18,36 +18,7 @@ cpglmm <- function(formula, link="log", data, weights, offset,
         wts <- fr$wts
   if (length(fr$off)) 
         offset <- fr$off
-
-  if (!is.null(betastart)){
-    if (length(betastart) != ncol(fr$X))
-      stop(gettextf("number of 'betastart' is %d should 
-                    equal %d (number of mean parameters)", 
-                length(betastart), ncol(fr$X)), domain = NA)
-    }
-  if (!is.null(phistart) && length(phistart)>1) 
-    stop("multiple values specified for 'phistart'")
-  if (!is.null(phistart) && phistart<=0)
-    stop("value of 'phistart' should be greater than 0")
-  if (!is.null(pstart) && length(pstart)>1) 
-    stop("multiple values specified for 'pstart'")
-  if (!is.null(pstart) && (pstart<=1 || pstart>=2))
-    stop("value of 'pstart' should be between 1 and 2")   
-  if (is.null(pstart))
-    pstart <- 1.5
-  
-  # generate starting values
-  glmFit <- glm.fit(fr$X, fr$Y, weights = wts, offset = offset, 
-      family = tweedie(var.power=pstart,link.power=link.power), 
-      intercept = attr(attr(fr$mf, "terms"), "intercept") > 0)
-
-  if (is.null(betastart))
-      betastart <- glmFit$coefficients
-  names(betastart) <- names(fr$fixef)
-  if (is.null(phistart))
-      phistart <- sum((fr$Y-glmFit$fitted.values)^2/glmFit$fitted.values^pstart)/
-                    glmFit$df.residual
-                  
+            
   # get factor list and dims                  
   FL <- lme4:::lmerFactorList(formula, fr, 0L, 0L)
   ctr <- do.call(cpglmm.control, control)
@@ -55,7 +26,7 @@ cpglmm <- function(formula, link="log", data, weights, offset,
   FL$dims["mxfn"] <- ctr$max.fun
   dm <- lme4:::mkZt(FL, NULL)
   dm$dd["verb"] <- ctr$trace
-  AGQlist <- .Call(lme4:::lme4_ghq, 1)                  
+  AGQlist <- .Call(lme4:::lme4_ghq, 1)
   M1 <- length(levels(dm$flist[[1]]))
   n <- ncol(dm$Zt)
   if (M1 >= n) {
@@ -66,13 +37,28 @@ cpglmm <- function(formula, link="log", data, weights, offset,
         else if (M1 == n) 
             message(msg1, "is *equal* to ", msg3)
     }
-        
-  # environment to evaluate tweedie density
-  tmp.env <- new.env( )
-  environment(ldtweedie) <- tmp.env
-                    
+  
+  # check initial values
+  if (!is.null(inits)){
+    check.inits.cpglmm(inits, dm$dd['p'], dm$dd['nt'])
+    betastart <- inits$beta 
+    names(betastart) <- names(fr$fixef)
+    phistart <- inits$phi 
+    pstart <- inits$p
+  } else {
+    pstart <- 1.5
+    # generate starting values
+    glmFit <- glm.fit(fr$X, fr$Y, weights = wts, offset = offset, 
+        family = tweedie(var.power=pstart,link.power=link.power), 
+        intercept = attr(attr(fr$mf, "terms"), "intercept") > 0)
+    betastart <- glmFit$coefficients
+    names(betastart) <- names(fr$fixef)
+    phistart <- sum((fr$Y-glmFit$fitted.values)^2/glmFit$fitted.values^pstart)/
+                    glmFit$df.residual
+    inits <- list(beta=betastart, phi=phistart, p=pstart)
+  }
   # input cpglmm class  for optimization 
-    ans <- new(Class = "cpglmm", env = tmp.env, nlmodel = (~I(x))[[2]], 
+  ans <- new(Class = "cpglmm", env = new.env( ), nlmodel = (~I(x))[[2]], 
         frame = fr$mf, call = call, flist = dm$flist, 
         Zt = dm$Zt, X = fr$X, y = fr$Y, pWt = unname(glmFit$prior.weights), 
         offset = unname(fr$off), Gp = unname(dm$Gp), dims = dm$dd, 
@@ -85,10 +71,11 @@ cpglmm <- function(formula, link="log", data, weights, offset,
         RZX = matrix(0, dm$dd[["q"]], dm$dd["p"]), RX = matrix(0, dm$dd["p"], dm$dd["p"]), 
         ghx = AGQlist[[1]], ghw = AGQlist[[2]], 
         p=pstart, phi=phistart,link.power=as.double(link.power), 
-        bound.p=ctr$bound.p)
+        bound.p=ctr$bound.p, formula = formula, contrasts = contrasts,
+        model.frame = fr$mf, inits = inits)
 
   # run optimization
-  invisible(.Call("cpglmm_optimize",ans,ldtweedie))
+  invisible(.Call("cpglmm_optimize",ans))
   if (ans@dims[["cvg"]] > 6) 
         warning(lme4:::convergenceMessage(ans@dims[["cvg"]]))
   invisible(.Call("mer_update_RX",ans))                  
@@ -117,8 +104,3 @@ cpglmm.control <- function(max.iter=300L,
        trace=as.integer(trace))  
 }
     
-# return -2*loglike given a list x
-ldtweedie <- function(x){
-  -2*sum(log(dtweedie(y=x[[1]],mu=x[[2]],phi=x[[3]],p=x[[4]])))	
-}
-  
