@@ -22,6 +22,7 @@
 
 /**
  * posterior log density of the index parameter p
+ * (this is the same as that in bcpglmm_tw)
  *
  * @param x value of p at which the log density is to be calculated
  * @param data a void struct, cocerced to SEXP internally
@@ -38,7 +39,7 @@ static double bcpglm_post_p_tw(double x, void *data){
 
 /**
  * posterior log density of the index parameter phi
- *
+ * (this is the same as that in bcpglmm_tw)
  * @param x value of phi at which the log density is to be calculated
  * @param data a void struct, cocerced to SEXP internally
  *
@@ -62,20 +63,15 @@ static double bcpglm_post_phi_tw(double x, void *data){
 static double bcpglm_post_beta_tw(double *x,  void *data){
     SEXP da = data ;
     int *dm = DIMS_ELT(da) ;
-    int nO = dm[nO_POS],
-        nP = dm[nP_POS],
-        nB = dm[nB_POS];    
+    int nO = dm[nO_POS], nP = dm[nP_POS], nB = dm[nB_POS];    
     int i, kk, *ygt0 = YPO_ELT(da) ;
     double ld=0, p= P_ELT(da)[0], phi = PHI_ELT(da)[0];
     double p2=2-p, p1=p-1;
-    double *offset= OFFSET_ELT(da), *wts =PWT_ELT(da), *X = X_ELT(da),
-        *Y = Y_ELT(da),*link_power = LKP_ELT(da),
-        *eta = ETA_ELT(da), *mu = MU_ELT(da),
+    double  *wts =PWT_ELT(da), *Y = Y_ELT(da), *mu = MU_ELT(da),
         *pbeta_mean = PBM_ELT(da), *pbeta_var = PBV_ELT(da) ;
 
     // update mu
-    cpglm_eta(eta, nO, nB, X, x, offset);
-    cplm_mu_eta(mu, (double *) NULL, nO, eta, *link_power) ;
+    cpglm_fitted_x(x, da) ;
     
     // loglikelihood from data
     for (i=0; i<nO; i++)
@@ -111,8 +107,7 @@ static double bcpglm_post_beta_tw(double *x,  void *data){
 static void bcpglm_mcmc_tw(SEXP da, int nR, int nit, int nbn, int nth,
                            double **sims, double *acc_pct){
     int *dm = DIMS_ELT(da) ;
-    int nO = dm[nO_POS],
-        nB = dm[nB_POS];
+    int nB = dm[nB_POS];
     int i, j, iter,  ns ;
     int  acc = 0, accept[] = {0,0,0};
     // bound for p and phi
@@ -121,16 +116,13 @@ static void bcpglm_mcmc_tw(SEXP da, int nR, int nit, int nbn, int nth,
     // proposal covariance matrix etc ...
     double *mh_beta_var = EBV_ELT(da), 
         mh_p_var = EPV_ELT(da)[0], mh_phi_var = EPHIV_ELT(da)[0],        
-        *offset= OFFSET_ELT(da),*X = X_ELT(da),
-        *link_power = LKP_ELT(da), *eta = ETA_ELT(da), *mu = MU_ELT(da),
         *beta= BETA_ELT(da), *p = P_ELT(da), *phi= PHI_ELT(da) ;
     double xtemp, *beta_sim = Alloca(nB, double) ;
     double p_sd = sqrt(mh_p_var), phi_sd = sqrt(mh_phi_var) ;
     R_CheckStack() ;
     
     // update eta and mu
-    cpglm_eta(eta, nO, nB, X, beta, offset);
-    cplm_mu_eta(mu, (double *) NULL, nO, eta, *link_power) ;
+    cpglm_fitted(da) ;
 
     GetRNGstate() ;
     for (iter=0;iter<nit;iter++){
@@ -150,10 +142,8 @@ static void bcpglm_mcmc_tw(SEXP da, int nR, int nit, int nbn, int nth,
                                beta_sim, bcpglm_post_beta_tw, (void *)da) ;
         Memcpy(beta, beta_sim, nB) ;
         accept[1] += acc ;
-    
         // update eta and mu
-        cpglm_eta(eta, nO, nB, X, beta, offset);
-        cplm_mu_eta(mu, (double *) NULL, nO, eta, *link_power) ;
+        cpglm_fitted(da) ;
         R_CheckUserInterrupt() ;
         
         // M-H update of phi using truncated normal
@@ -165,7 +155,7 @@ static void bcpglm_mcmc_tw(SEXP da, int nR, int nit, int nbn, int nth,
         
         // print out acceptance rate if necessary
         if (nR>0 && (iter+1)%nR==0){
-            Rprintf(_("Acceptance rate: beta(%4.2f%%), phi(%4.2f%%), p(%4.2f%%),\n"),
+            Rprintf(_("Acceptance rate: beta(%4.2f%%), phi(%4.2f%%), p(%4.2f%%)\n"),
                     accept[1]*1.0/(iter+1)*100, accept[2]*1.0/(iter+1)*100,
                     accept[0]*1.0/(iter+1)*100 );
         }    

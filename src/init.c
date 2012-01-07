@@ -1,6 +1,30 @@
+/**
+ * @file init.c
+ * @brief Register native routines and  initialize
+ * cholmod_common struct used in mixed effect models     
+ * @author Wayne Zhang                          
+*/
+
 #include "cplm.h"
 #include <R_ext/Rdynload.h>
 #include "Matrix.h"
+
+#define CALLDEF(name, n)  {#name, (DL_FUNC) &name, n}
+
+/** function that registers native routines  */
+static R_CallMethodDef CallEntries[] = {
+
+    CALLDEF(cpglmm_optimize, 1),
+    CALLDEF(cpglmm_update_mu, 1),
+    CALLDEF(cpglmm_update_u, 1),
+    CALLDEF(cpglmm_update_L, 1),
+    CALLDEF(cpglmm_update_dev, 2),
+    CALLDEF(cpglmm_setPars, 2),    
+    CALLDEF(bcpglmm_gibbs_tw, 1),
+    CALLDEF(bcpglm_gibbs_tw, 1),
+    CALLDEF(bcpglm_gibbs_lat, 1),
+    {NULL, NULL, 0}
+};
 
 /** cholmod_common struct local to the cplm package */
 cholmod_common c;
@@ -37,6 +61,9 @@ __attribute__ ((visibility ("default")))
 #endif
 void R_init_cplm(DllInfo *dll)
 {
+    R_registerRoutines(dll, NULL, CallEntries, NULL, NULL);
+    R_useDynamicSymbols(dll, FALSE);
+
     M_R_cholmod_start(&c);
     c.final_ll = 1;	    /* LL' form of simplicial factorization */
 
@@ -45,7 +72,7 @@ void R_init_cplm(DllInfo *dll)
 
 }
 
-/** Finalizer for lme4 called upon unloading the package.
+/** Finalizer for cplm called upon unloading the package.
  *
  */
 void R_unload_cplm(DllInfo *dll){

@@ -20,10 +20,10 @@ dyn.load("src/cplm.dll")
 dyn.unload("src/cplm.dll")
 
 fineroot$x <- rnorm(nrow(fineroot))
-expCall <- expand.call(amer,call("amer",RLD~  Zone*Stock + (1|Plant) + tp(x), 
+call <- expand.call(cpglmm,call("cpglmm",RLD~  Zone + (1|Plant) + tp(x), 
              data = fineroot, basisGenerators=c("tp", "tpU",
     "bsp")))  
-formula <-   RLD~   Zone*Stock + (1|Plant) + tp(x)
+formula <-   RLD~   Zone + (1|Plant) + tp(x)
 link <- "log"
 control <- list()
 

@@ -27,13 +27,7 @@
 /** cholmod_common struct initialized  */
 extern cholmod_common c;
 
-/* Constants */
-
-#ifndef BUF_SIZE
-/** size of buffer for an error message */
-#define BUF_SIZE 127
-#endif
-
+/* Constants used in Penalized Least Squares*/
 /** Maximum number of iterations in update_u */
 #define CM_MAXITER  300
 /** Tolerance level for convergence criterion in update_u */
@@ -190,6 +184,11 @@ static R_INLINE double *SLOT_REAL_NULL(SEXP obj, char *str)
  *  ranef has length 0) */
 #define RANEF_SLOT(x) SLOT_REAL_NULL(x, "ranef")
 
+/** Return the double pointer to the ghw slot */
+#define GHW_SLOT(x) SLOT_REAL_NULL(x, "ghw")
+
+/** Return the double pointer to the ghx slot */
+#define GHX_SLOT(x) SLOT_REAL_NULL(x, "ghx")
 
 /**
  * Permute the vector src according to perm into dest
@@ -364,40 +363,6 @@ static void update_A(SEXP x)
 
 
 /**
- * Update the contents of the ranef slot in an mer object using the
- * current contents of the u and ST slots.
- *
- * b = T  %*% S %*% t(P) %*% u
- *
- * @param x an mer object
- */
-static void update_ranef(SEXP x)
-{
-    int *Gp = Gp_SLOT(x), *dims = DIMS_SLOT(x), *perm = PERM_VEC(x);
-    int nt = dims[nt_POS], q = dims[q_POS];
-    double *b = RANEF_SLOT(x), *u = U_SLOT(x), one[] = {1,0};
-    int *nc = Alloca(nt, int), *nlev = Alloca(nt, int);
-    double **st = Alloca(nt, double*);
-    R_CheckStack();
-
-    ST_nc_nlev(GET_SLOT(x, install("ST")), Gp, st, nc, nlev);
-				/* inverse permutation */
-    for (int i = 0; i < q; i++) b[perm[i]] = u[i];
-    for (int i = 0; i < nt; i++) {
-	for (int k = 0; k < nc[i]; k++) { /* multiply by \tilde{S}_i */
-	    double dd = st[i][k * (nc[i] + 1)];
-	    int base = Gp[i] + k * nlev[i];
-	    for (int kk = 0; kk < nlev[i]; kk++) b[base + kk] *= dd;
-	}
-	if (nc[i] > 1) {	/* multiply by \tilde{T}_i */
-	    F77_CALL(dtrmm)("R", "L", "T", "U", nlev + i, nc + i, one,
-			    st[i], nc + i, b + Gp[i], nlev + i);
-	}
-    }
-}
-
-
-/**
  * Update the L, sqrtrWt and resid slots.  It is assumed that
  * update_mu has already been called at the current values of u and
  * the model parameters and that A has been updated.
@@ -407,7 +372,7 @@ static void update_ranef(SEXP x)
  * @return penalized weighted residual sum of squares
  *
  */
-static double update_L(SEXP x)
+static double cp_update_L(SEXP x)
 {
     int *dims = DIMS_SLOT(x);
     int n = dims[n_POS] ;
@@ -422,7 +387,7 @@ static double update_L(SEXP x)
     // Update srwt and res. Reevaluate wrss. 
     d[wrss_POS] = 0;
     for (int j = 0; j < n; j++) {
-        srwt[j] = sqrt((pwt ? pwt[j] : 1.0) / (var ? var[j] : 1.0));
+        srwt[j] = sqrt((pwt ? pwt[j] : 1.0) / (var ? var[j] : 1.0)) ;
         res[j] = srwt[j] * (y[j] - mu[j]);
         d[wrss_POS] += res[j] * res[j];
     }
@@ -436,14 +401,14 @@ static double update_L(SEXP x)
     //  a scaled version of A: A * sqrt(W) 
     for (int j = 0; j < n; j++)
         for (int p = ap[j]; p < ap[j + 1]; p++)
-            cx[p] = ax[p] * sXwt[j];
+            cx[p] = ax[p] * sXwt[j] ;
     A->x = (void*)cx;
-            
+    
     // compute the cholesky factor of AA'+I with permutation
     if (!M_cholmod_factorize_p(A, one, (int*)NULL, 0, L, &c))
 	error(_("cholmod_factorize_p failed: status %d, minor %d from ncol %d"),
 	      c.status, L->minor, L->n);
-
+    
     d[ldL2_POS] = M_chm_factor_ldetL2(L);
     d[pwrss_POS] = d[usqr_POS] + d[wrss_POS];
     return d[pwrss_POS];
@@ -468,12 +433,12 @@ static double cp_update_mu(SEXP x)
     int i1 = 1, n = dims[n_POS], p = dims[p_POS];
     int  i ;
     double  *d = DEV_SLOT(x), *eta = ETA_SLOT(x),
-	 *mu = MU_SLOT(x),
+        *mu = MU_SLOT(x),
 	*muEta = MUETA_SLOT(x), *offset = OFFSET_SLOT(x),
 	*srwt = SRWT_SLOT(x), *res = RESID_SLOT(x),
-    *lkp = LKP_SLOT(x), *vp = P_SLOT(x),
+        *lkp = LKP_SLOT(x), *vp = P_SLOT(x),
         *var = VAR_SLOT(x), 
-         *y = Y_SLOT(x), one[] = {1,0};
+        *y = Y_SLOT(x), one[] = {1,0};
     CHM_FR L = L_SLOT(x);
     CHM_SP A = A_SLOT(x);
     CHM_DN Ptu, ceta, cu = AS_CHM_DN(GET_SLOT(x, install("u")));
@@ -493,7 +458,6 @@ static double cp_update_mu(SEXP x)
     M_cholmod_free_dense(&Ptu, &c);
 
     // update mu, muEta and var
-    //FIXME: need to write a version consistent with other models
     cplm_mu_eta(mu, muEta, n, eta, *lkp);
     cplm_varFun(var,mu, n,*vp);
    
@@ -545,13 +509,12 @@ static int cp_update_u(SEXP x)
  
     for (i = 0; ; i++) {
 	Memcpy(uold, u, q);
-	pwrss_old = update_L(x);
+	pwrss_old = cp_update_L(x);
         // tmp := PC %*% wtdResid 
 	M_cholmod_sdmult(C, 0 , one, zero, cres, ctmp, &c);
 	Memcpy(tmp1, tmp, q);
 	apply_perm(tmp, tmp1, (int*)L->Perm, q);
 				// tmp := tmp - u 
-
 	for (int j = 0; j < q; j++) tmp[j] -= u[j];
 				// solve L %*% sol = tmp 
 	if (!(sol = M_cholmod_solve(CHOLMOD_L, L, ctmp, &c)))
@@ -585,7 +548,7 @@ static int cp_update_u(SEXP x)
 }
 
 /**
- * Update the ST, A, L, u, fixef and deviance slots of an mer object.
+ * Update the ST and A slots of an mer object.
  *
  * @param x an mer object
  * @param pars double vector of the appropriate length
@@ -615,32 +578,133 @@ ST_setPars(SEXP x, const double *pars)
     update_A(x);
 }
 
+
+/**
+ * Update the ST, A, fixef, phi and p slots 
+ *
+ * @param x an cpglmm object
+ * @param pars double vector of the appropriate length: theta, beta, log(phi) and p in order
+ * @return updated deviance
+ *
+ */
+static void cp_setPars(SEXP x, double *pars){
+    int *dims = DIMS_SLOT(x) ;
+    int phi_POS = dims[np_POS] + dims[p_POS] ;    
+    double  *phi = PHI_SLOT(x),
+      *p = P_SLOT(x), *fixef = FIXEF_SLOT(x) ;
+    // update ST from parm
+    ST_setPars(x, pars);
+    // update fixef, phi and p
+    Memcpy(fixef, pars + dims[np_POS], dims[p_POS]);
+    phi[0] = exp(pars[phi_POS])  ;
+    p[0] = pars[phi_POS + 1] ;       
+}
+
 /**
  * Compute twice negative marginal logliklihood to be used in optimization. 
  * This is different from that in lme4, so I added the prefix "cp".
  *
- * @param x a cplm object
- *
+ * @param x a cpglmm object
+ * @param parm vector of parameters: theta, beta, log(phi) and p in order
+ *            
  * @return twice negative marginal logliklihood
  *
  */
-static double cp_update_dev(SEXP x)
+static double cp_update_dev(SEXP x, double *parm)
 {
-    int n = DIMS_SLOT(x)[n_POS];
+    int *dims = DIMS_SLOT(x) ;
+    int n = dims[n_POS], 
+      q = dims[q_POS], nAGQ = dims[nAGQ_POS] ;
+    SEXP flistP = GET_SLOT(x, install("flist"));
     double *d = DEV_SLOT(x), *y = Y_SLOT(x),
-        *mu = MU_SLOT(x), *phi=PHI_SLOT(x),
-        *p = P_SLOT(x), ans ;
-
+      *mu = MU_SLOT(x), *phi = PHI_SLOT(x),
+      *p = P_SLOT(x), *pwt = PWT_SLOT(x),
+      *u = U_SLOT(x);
+    CHM_FR L = L_SLOT(x);
+    
+    if (parm != NULL) cp_setPars(x, parm) ;
     // find conditional mode
     cp_update_u(x);
-    d[ML_POS] = d[ldL2_POS];   //variance of u    
-    ans = dl2tweedie(n, y, mu, *phi, *p) ;
-    d[disc_POS] = ans;
-    d[ML_POS] += d[disc_POS] + d[usqr_POS]; 
-    return d[ML_POS];
-            
-}
 
+    if (nAGQ < 1) error("nAGQ must be positive");
+    if ((nAGQ > 1) & (LENGTH(flistP) != 1))
+      error("AGQ method requires a single grouping factor");
+    d[ML_POS] = d[ldL2_POS];
+
+    // Laplace Approximation 
+    if (nAGQ == 1) {
+      double ans=0 ;
+      for (int i=0;i<n;i++)
+        ans += dtweedie(y[i],mu[i],phi[0]/pwt[i],p[0]) ; //log-likelihood
+      d[disc_POS] = - 2* ans;
+      d[ML_POS] += d[disc_POS] + d[usqr_POS] / phi[0] ; 
+      return d[ML_POS]; 
+    } else {
+      // Adaptive Gauss-Hermite quadrature 
+      const int nl = nlevels(VECTOR_ELT(flistP, 0));
+      const int nre = q / nl; 	/* number of random effects per level */
+      int *fl0 = INTEGER(VECTOR_ELT(flistP, 0)), *pointer = Alloca(nre, int);
+      double *ghw = GHW_SLOT(x), *ghx = GHX_SLOT(x),
+	//
+	*uold = Memcpy(Calloc(q, double), u, q),
+	*tmp = Calloc(nl, double),
+	w_pro = 1, z_sum = 0;           /* values needed in AGQ evaluation */
+      const double sigma = sqrt(phi[0]);
+      R_CheckStack();
+      AZERO(pointer, nre);
+      AZERO(tmp, nl);
+
+      while(pointer[nre - 1] < nAGQ){
+	double *z = Calloc(q, double);       /* current abscissas */
+	double *ans = Calloc(nl, double);    /* current penalized residuals in different levels */
+	/* update abscissas and weights */
+	for(int i = 0; i < nre; ++i){
+	  for(int j = 0; j < nl; ++j)
+	    z[i + j * nre] = ghx[pointer[i]];
+	  w_pro *= ghw[pointer[i]];
+	  z_sum += z[pointer[i]] * z[pointer[i]]; // constant used in AGQ
+	}
+	// scaling: u = u_old + sigma * z / L_ii
+	CHM_DN cz = N_AS_CHM_DN(z, q, 1), sol;
+	if(!(sol = M_cholmod_solve(CHOLMOD_L, L, cz, &c)))
+	  error(_("cholmod_solve(CHOLMOD_L) failed"));
+	Memcpy(z, (double *)sol->x, q);
+	M_cholmod_free_dense(&sol, &c);   // z / L_ii
+	for(int i = 0; i < q; ++i) 
+	  u[i] = uold[i] + sqrt(2) * sigma * z[i];   
+	cp_update_mu(x);
+	// get data likelihood
+	AZERO(ans, nl);
+	for (int i = 0; i < n; i++) {
+	  ans[fl0[i] - 1] +=  dtweedie(y[i], mu[i], phi[0] / pwt[i], p[0]) ; 
+	}
+	// contribution from u
+	for(int i = 0; i < nre; ++i)
+	  for(int j = 0; j < nl; ++j)
+	    ans[j] -= 0.5 * u[i + j * nre] * u[i + j * nre] / phi[0];
+	// adaptive GHQ estimate 
+	for(int i = 0; i < nl; ++i)
+	  tmp[i] += exp(ans[i] + z_sum ) * w_pro / sqrt(PI);
+	// move pointer to next combination of weights and abbsicas 
+	int count = 0;
+	pointer[count]++;
+	while(pointer[count] == nAGQ && count < nre - 1){
+	  pointer[count] = 0;
+	  pointer[++count]++;
+	}
+	w_pro = 1;
+	z_sum = 0;
+	if(z)    Free(z);
+	if(ans)  Free(ans);
+      }
+      for(int j = 0; j < nl; ++j) d[ML_POS] -= 2 * log(tmp[j]);
+      Memcpy(u, uold, q);
+      cp_update_mu(x);
+      if(tmp)   Free(tmp);
+      if(uold)  Free(uold);
+      return d[ML_POS] ;
+    }
+}
 
 
 /**
@@ -650,7 +714,6 @@ static double cp_update_dev(SEXP x)
  * phi (scale parameter) and p (index parameter) 
  *
  * @param x pointer to an mer object
- * @param fun function to compute the -2 loglik
  *
  * @return R_NilValue
  */
@@ -669,12 +732,13 @@ SEXP cpglmm_optimize(SEXP x)
 	*v = Alloca(lv, double), *xv = Alloca(nv, double);
     R_CheckStack();
 
+    // retrieve parameter values from x 
     ST_getPars(x, xv); /* update xv for theta */
-    
-    double eta = 1.e-5; /* estimated rel. error on computed lpdisc */
     Memcpy(xv + dims[np_POS], fixef, dims[p_POS]); /*update xv for beta*/
     xv[nv1] = log(PHI_SLOT(x)[0]) ;
     xv[nv1+1] = P_SLOT(x)[0] ;
+    
+    double eta = 1.e-5; /* estimated rel. error on computed lpdisc */
     v[31] = eta;		/* RFCTOL */
     v[36] = eta;		/* SCTOL */
     v[41] = eta;		/* ETA0 */
@@ -693,29 +757,33 @@ SEXP cpglmm_optimize(SEXP x)
 	for (int j = 0; j < nc; j++) b[pos + 2*j] = 0;
 	pos += nc * (nc + 1);
     }
-
     /* reset bound for p */
     b[(nv1+1)*2]= BDP_SLOT(x)[0] ;
     b[nv*2-1] = BDP_SLOT(x)[1] ;
 
     /* run optimization */
     do {
-        Memcpy(fixef, xv + dims[np_POS], dims[p_POS]);
-	ST_setPars(x, xv);	/* update ST and A etc. */
-        PHI_SLOT(x)[0]= exp(xv[nv1]) ;
-        P_SLOT(x)[0]= xv[nv1+1] ;       
-	fx = cp_update_dev(x);        
+        fx = cp_update_dev(x, xv);        
 	S_nlminb_iterate(b, d, fx, g, h, iv, liv, lv, nv, v, xv);
     } while (iv[0] == 1 || iv[0] == 2);
-    ST_setPars(x, xv);
-    update_ranef(x);
-    cp_update_mu(x) ;
+    fx = cp_update_dev(x, xv) ; //update slots using the values at the minima
     dims[cvg_POS] = iv[0];
     return R_NilValue;
 }
 
+
 /* functions callable from R */
 
+/**
+ * R callable function to update L
+ *
+ * @param x a R list object
+ *
+ * @return penalized, weighted residual sum of squares
+*/
+SEXP cpglmm_update_L(SEXP x){
+    return ScalarReal(cp_update_L(x));
+}
 
 /**
  * R callable function to update mu
@@ -743,11 +811,25 @@ SEXP cpglmm_update_u(SEXP x){
 /**
  * R callable function to update deviance
  *
- * @param x a R list object
+ * @param x a cpglmm object
+ * @param pm vector of parameters: theta, beta, log(phi) and p in order
  *
  * @return twice negative loglikelihood
 */
-SEXP cpglmm_update_dev(SEXP x){
-    return ScalarReal(cp_update_dev(x));
+
+SEXP cpglmm_update_dev(SEXP x, SEXP pm){  
+  return ScalarReal(cp_update_dev(x, (pm != R_NilValue) ? REAL(pm) : (double*) NULL));            
 }
 
+
+/**
+ * R callable function to update parameters
+ *
+ * @param x a cpglmm object
+ * @param pm vector of parameters: theta, beta, log(phi) and p in order
+ *
+*/
+SEXP cpglmm_setPars(SEXP x, SEXP pm){  
+    cp_setPars(x, REAL(pm)) ;
+    return R_NilValue ;      
+}

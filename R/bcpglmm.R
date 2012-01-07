@@ -9,27 +9,37 @@ bcpglmm <- function(formula, link = "log", data, inits = NULL,
                    n.thin=max(1, floor(n.chains * (n.iter - n.burnin) / n.sims)),
                    n.sims=1000, n.report=1000, prior.beta.mean=NULL, prior.beta.var=NULL, 
                    bound.phi=100, bound.p=c(1.01,1.99),  prior.Sigma = NULL,
-                   tune.iter=4000, n.tune=10, tune.weight=0.25,...) {
+                   tune.iter=4000, n.tune=10, tune.weight=0.25,
+                   basisGenerators = c("tp","tpU","bsp","sp2d"),
+                   method="dtweedie",...) {
       
-   
-  call <- match.call()  
+  call <- amer:::expand.call()  
   if (missing(data)) 
-    data <- environment(formula)  
+    data <- environment(formula)   
   link.power <- make.link.power(link)
-  # create model frame 
-  fr <- lme4:::lmerFrames(call, formula, contrasts)
-  offset <- wts <- NULL
-  if (length(fr$wts)) 
-        wts <- fr$wts
-  if (length(fr$off)) 
-        offset <- fr$off
+  # identify smooth terms 
+  tf <- terms.formula(formula, specials = eval(call$basisGenerators, 
+        parent.frame(2)))
+  n.f <- length(unlist(attr(tf, "specials")))
+  # create model frame and get factor list
+  if (n.f) {
+    call2 <- as.list(call)[-1]
+    m <- match(c("formula", "data", "weights", "offset", 
+                        "contrasts", "basisGenerators"), names(call2),0L)
+    call2 <- call2[m]
+    #setup <- do.call(amer:::amerSetup, as.list(call2))     
+    setup <- do.call(frFL, as.list(call2))
+    fr <- setup$m$fr 
+    FL <- setup$m$FL
+  } else {  
+    fr <- lme4:::lmerFrames(call, formula, contrasts)
+    FL <- lme4:::lmerFactorList(formula, fr, 0L, 0L)
+  }
   
-  # get factor list and dims                  
-  FL <- lme4:::lmerFactorList(formula, fr, 0L, 0L)
-  dm <- lme4:::mkZt(FL, NULL)
+  dm <- lme4:::mkZt(FL, NULL)  
   n.obs <- unname(dm$dd['n'])
   n.beta <- unname(dm$dd['p'])
-  
+ 
   # check initial values
   if (!is.null(inits))
     check.inits.bcpglmm(inits=inits,n.beta=ncol(fr$X),
@@ -53,10 +63,13 @@ bcpglmm <- function(formula, link = "log", data, inits = NULL,
     prior.Sigma <- prior.Sigma.default(dm$ST)
   
   # default weights and offsets if NULL    
-  if (is.null(wts))     
-      wts <- rep.int(1, n.obs)
-  if (is.null(offset)) 
-        offset <- rep.int(0, n.obs)
+ # default offset and prior wts
+ if (is.null(fr$wts) || length(fr$wts)==0)  
+    wts <- as.double(rep(1,n.obs)) else 
+    wts <- fr$wts 
+  if (is.null(fr$off) || length(fr$off)==0)
+    off <- as.double(rep(0,n.obs)) else 
+    off <- fr$off
   
   # dimensions used in simulation
   nc <- unlist(lapply(dm$ST, ncol))
@@ -88,12 +101,15 @@ bcpglmm <- function(formula, link = "log", data, inits = NULL,
                    
   # generate initial values if necessary
   if (is.null(inits)) {
-    fit.start <- cplm:::cpglmm(formula=formula, link = link, data=data)
-    pstart <- fit.start@p
-    betastart <- as.numeric(fixef(fit.start))
-    ustart <- as.double(unlist(lapply(ranef(fit.start), as.vector)))
-    phistart <- fit.start@phi
-		Sigmastart <- lapply(fit.start@ST,function(x) x%*%t(x))
+    pstart <- 1.5
+    fit.start <- glm.fit(fr$X, fr$Y, weights = wts, offset = off, 
+        family = tweedie(var.power=pstart,link.power=link.power), 
+        intercept = attr(attr(fr$mf, "terms"), "intercept") > 0)
+    betastart <- as.numeric(fit.start$coefficients)
+    ustart <- rnorm(dm$dd[["q"]])
+    phistart <- sum((fr$Y-fit.start$fitted.values)^2/fit.start$fitted.values^pstart)/
+                    fit.start$df.residual
+		Sigmastart <- lapply(dm$ST,function(x) x%*%t(x))
   	Sigmastartv <- unlist(lapply(Sigmastart, as.numeric))
     inits.start <- c(betastart, phistart, pstart, ustart, Sigmastartv)
     inits <- vector("list",n.chains)
@@ -107,11 +123,16 @@ bcpglmm <- function(formula, link = "log", data, inits = NULL,
                     Sigmastartv)
 	   }
     #update proposal
-    ebeta.var <- as.matrix(vcov(fit.start)*C/n.beta)
+    #ebeta.var <- as.matrix(vcov(fit.start)*C/n.beta)
     eu.var <- lapply(1:dm$dd['nt'], function(x) 
               kronecker(Sigmastart[[x]],diag(1,nrow=nlev[x])))
     eu.var <- as.matrix(do.call(bdiag, eu.var))*C/dm$dd['q']
   } else{
+    betastart <- inits[[1]]$beta
+    phistart <- inits[[1]]$phi
+    pstart <- inits[[1]]$p
+    ustart <- inits[[1]]$u
+    Sigmastart <- inits[[1]]$Sigma
     inits <- lapply(inits, function(x) c(x$beta, x$phi, x$p, x$u,
                                       unlist(lapply(x$Sigma, as.numeric))))
   }
@@ -122,7 +143,7 @@ bcpglmm <- function(formula, link = "log", data, inits = NULL,
                y=as.double(fr$Y),
                Zt = dm$Zt, 
                ygt0= as.integer(which(fr$Y>0L)-1),
-               offset=as.double(offset),
+               offset=as.double(off),
                pWt=as.double(wts),
                mu = double(dims["n.obs"]),
                eta = double(dims["n.obs"]),
@@ -146,9 +167,15 @@ bcpglmm <- function(formula, link = "log", data, inits = NULL,
                Gp = unname(dm$Gp),
                Sigma = Sigmastart,
                ncol = as.integer(nc), 
-               nlev = as.integer(nlev))
+               nlev = as.integer(nlev),
+               lambda = as.double(2),
+               k = as.integer(1),
+               simT = as.integer(rep(1,dims["n.pos"])))
 
-  sims.list <- .Call("bcpglmm_gibbs_tw", input) 
+  if (method=="dtweedie")
+    sims.list<- .Call("bcpglmm_gibbs_tw",input) 
+  if (method=="latent")
+    sims.list<- .Call("bcpglmm_gibbs_lat",input)
   xnames <- names(fr$fixef)
   unames <- paste("u", 1:dm$dd['q'],sep="")
   snames <- sapply(1:length(dm$ST), function(x){
@@ -178,7 +205,11 @@ bcpglmm <- function(formula, link = "log", data, inits = NULL,
              formula=formula,
              model.frame = fr$mf,
              contrasts=contrasts,
-             inits = inits)  
+             inits = inits,
+             prop.var = list(beta.var = matrix(input$ebeta.var,n.beta,n.beta), 
+                             u.var = matrix(input$eu.var,dm$dd['q'],dm$dd['q']),
+                             phi.var = input$ephi.var,
+                             p.var = input$ep.var))  
   return(ans)
                   
 }        

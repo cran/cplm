@@ -35,6 +35,9 @@ phi.scale=0.001
 tune.iter=5000
 n.tune=10
 tune.weight=0.25
+bound.phi =100
+prior.beta.var=NULL
+prior.beta.mean=NULL
 
 dyn.load("src/cpglm_bayes.dll")  
 
@@ -52,6 +55,8 @@ set.seed(10)
 
 mf <- match.call(bcpglm,call("bcpglm",increLoss~ factor(year)+factor(lag),
                              data=insLoss))
+
+
 
 
 dyn.load("src/cpglm_bayes.dll")             

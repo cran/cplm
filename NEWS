@@ -1,4 +1,40 @@
 ================
+Version 0.5-1
+================
+NEW FEATURES
+
+   o Methods 'mcmcsamp' now is not available for 'cpglm' and 'cpglmm' objects
+	as a convenient way to perform MCMC simulations.
+   o Function 'cpglmm' handles additive models in a similar way as the package
+	'amer'.
+   o Big data capability is added to function 'cpglm', which uses the bounded
+	memory regression facility from the package 'biglm'.
+   o Function 'cpglmm' has an additional argument 'optimizer' that allows the 
+	users to choose which optimization routine to be used. The package 
+	'minqa' is now imported for the use 'bobyqa'.
+   o Function 'cpglmm' now implements adaptive Gauss-Hermite quadrature method
+	for models with a single grouping factor. 
+   o Function 'bcpglmm' now implements an additional latent variable approach. 
+
+CHANGES:
+   (user-visible)	
+   o The MCEM method is now completely removed from 'cpglm'
+   o In 'cpglmm', the Laplace approximated loglikelihood seems to have left out 
+	the dispersion parameter for one term, resulting a larger than expected 
+	variance component estimate. This is now fixed and it is more consistent 
+	with the quadrature estimate. 
+   o Add method 'predict' for 'cpglm' and 'cpglmm', which computes the predicted
+	values for a new data set, but not the prediction errors. 
+   o In 'cpglmm', fix a bug in specifying 'offset'
+   o In 'cpglmm', 'sigmaML' is updated after fitting the model so that the 
+	'postVar' option in 'ranef' in 'lme4' can be used now. 
+   o 'weights' was not reflected in the update of the deviance. This is fixed now. 
+   o In 'cpglmm', 'vcov' now computes variances for 'phi' and 'p'
+
+   (not user-visible)	
+   o register native routines in initialization
+
+================
 Version 0.4-1
 ================
 NEW FEATURES

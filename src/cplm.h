@@ -18,12 +18,7 @@
 #include <R_ext/Applic.h>
 #include <R_ext/Lapack.h>
 #include <R_ext/Linpack.h>
-
-
-/** constant used in numerical gradient and hessian */
-#define EPS (0.001)
-/** constant used in optim to convert min to max */
-#define SCALE (-1)   
+#include "Matrix.h"
 
 /** zero an array */
 #define AZERO(x, n) {int _I_, _SZ_ = (n); for(_I_ = 0; _I_ < _SZ_; _I_++) (x)[_I_] = 0;}
@@ -172,7 +167,7 @@ static R_INLINE double *ELT_REAL_NULL(SEXP obj, char *str)
  *  sqrtXWt has length 0) */
 #define PHI_ELT(x) ELT_REAL_NULL(x, "phi")
 
-/** Return the double pointer to the link_power slot or (double*) NULL if
+/** Return the double pointer to the link.power slot or (double*) NULL if
  *  sqrtXWt has length 0) */
 #define LKP_ELT(x) ELT_REAL_NULL(x, "link.power")
 
@@ -222,6 +217,15 @@ static R_INLINE double *ELT_REAL_NULL(SEXP obj, char *str)
 /** Return the double pointer to the iwish.df slot  */
 #define IWDF_ELT(x) ELT_REAL_NULL(x,"iwish.df")
 
+/** Return the integer pointer to the simT slot */
+#define SIMT_ELT(x) INTEGER(getListElement(x, "simT"))
+
+/** Return the integer pointer to the k slot */
+#define K_ELT(x) INTEGER(getListElement(x, "k"))
+
+/** Return the double pointer to the lambda slot  */
+#define LAM_ELT(x) ELT_REAL_NULL(x,"lambda")
+
 
 // memory allocation utilities
 double * dvect(int n) ;
@@ -254,9 +258,8 @@ void cpglm_eta(double *eta, int nO, int nB, double *X,
 void cplm_mu_eta(double* mu, double* muEta, int n, double* eta, 
 		   double link_power);
 void cplm_varFun(double* var, double* mu, int n, double p);
-void cpglm_fitted(double *eta, double *mu, double *muEta,
-                 da_parm *dap);
-
+void cpglm_fitted(SEXP da);
+void cpglm_fitted_x(double *x, SEXP da);
 
 // cplm
 double cplm_post_latT(double x, double y, double phi, double p) ; 
@@ -265,13 +268,8 @@ double cplm_lambda_tpois(double y, double phi, double p) ;
 int cplm_rtpois(double lambda ) ;
 // function to compute the density of 0-truncated poisson on log scale
 double cplm_dtpois(double x, double lambda) ;
-void cplm_rlatT_reject (int nS, int *ans, da_parm *dap) ;
-
-void cplm_tw_glm(double *x, double *y, double *off, double *wts, 
-		 double *beta, double vp, double lp, int n, int p) ;
-
-double cplm_llikS(double *mu, double phi, double p,
-		      int *simT, da_parm *dap);
+void cplm_rlatT_reject(SEXP da) ;
+double cplm_llik_lat(SEXP da);
 
 
 // M-H 
@@ -293,3 +291,31 @@ double dtweedie(double y, double mu,
 double dl2tweedie(int n, double *y, double *mu,
                   double phi, double p) ;
 void rwishart(int d, double nu, double *scal, double *out) ;
+
+// utility functions in bcpglmm
+void bcpglmm_set_sims(SEXP da, int ns, double **sims) ;
+void bcpglmm_set_init(SEXP da, int k) ;
+void cpglmm_fitted(SEXP da) ;
+void cpglmm_fitted_bx(double *x, SEXP da) ;
+void cpglmm_fitted_ux(double *x, SEXP da) ;
+
+
+// functions to export 
+SEXP cpglmm_optimize(SEXP x) ;
+SEXP cpglmm_update_mu(SEXP x) ;
+SEXP cpglmm_update_u(SEXP x) ;
+SEXP cpglmm_update_L(SEXP x) ;
+SEXP cpglmm_update_dev(SEXP x, SEXP pm) ;
+SEXP cpglmm_setPars(SEXP x, SEXP pm) ;
+SEXP bcpglmm_gibbs_tw (SEXP da) ;
+SEXP bcpglmm_gibbs_lat (SEXP da) ;
+SEXP bcpglm_gibbs_lat (SEXP da) ;
+SEXP bcpglm_gibbs_tw (SEXP da) ;
+
+// numerical derivatives
+void grad(int n, double *x, 
+          double (*myfunc)(double *x, void *data), 
+          void *data, double *ans) ;
+void hess(int n, double *x, 
+          double (*myfunc)(double *x, void *data), 
+          void *data, double *ans) ;

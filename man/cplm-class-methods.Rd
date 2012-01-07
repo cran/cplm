@@ -11,18 +11,17 @@
 \alias{show,cplm-method}
 \alias{terms,cplm-method}
 \alias{formula,cplm-method}
+\alias{vcov,cplm-method}
 
 \alias{cpglm-class}
 \alias{coef,cpglm-method}
-\alias{fitted.values,cpglm-method}
 \alias{fitted,cpglm-method}
 \alias{residuals,cpglm-method}
 \alias{resid,cpglm-method}
 \alias{AIC,cpglm,missing-method}
 \alias{deviance,cpglm-method}
-\alias{df.residual,cpglm-method}
-\alias{vcov,cpglm-method}
 \alias{summary,cpglm-method}
+\alias{predict,cpglm-method}
 
 \alias{cpglmm-class}
 \alias{print,cpglmm-method}
@@ -30,6 +29,7 @@
 \alias{show,cpglmm-method}
 \alias{VarCorr,cpglmm-method}
 \alias{vcov,cpglmm-method}
+\alias{predict,cpglmm-method}
 \alias{summary.cpglmm-class}
 
 \alias{bcpglm-class}
@@ -45,7 +45,7 @@
 \title{Classes and Methods for a Compound Poisson Linear Model Object}
 
 \description{
-Documented here are the class \code{"cplm"} used to repesent a compound Poisson linear model object and its derived classes \code{"cpglm"}, \code{"cpglmm"}, \code{"bcpglm"} and \code{"bcpglmm"}. Several primitive methods and statistical methods are created to facilitate the extraction of specific slots and further statistical analysis. \code{"NullNum"},  \code{"NullList"} and \code{"NullFunc"} are virtual classes for \code{c("NULL", "numeric")}, \code{c("NULL","list")} and \code{c("NULL","function")}, respectively. 
+Documented here are the class \code{"cplm"} used to represent a compound Poisson linear model object and its derived classes \code{"cpglm"}, \code{"cpglmm"}, \code{"bcpglm"} and \code{"bcpglmm"}. Several primitive methods and statistical methods are created to facilitate the extraction of specific slots and further statistical analysis. \code{"NullNum"},  \code{"NullList"} and \code{"NullFunc"} are virtual classes for \code{c("NULL", "numeric")}, \code{c("NULL","list")} and \code{c("NULL","function")}, respectively. 
 }
 
 \section{Objects from the Class}{
@@ -73,7 +73,7 @@ Documented here are the class \code{"cplm"} used to repesent a compound Poisson 
   }
   
 
- The \code{"cpglm"} class extends \code{"cplm"} dirctly and is a variant of \code{\link{glm}} with additional functionality to estimate the index parameter. So most of the slots have the same definition as those in \code{\link{glm}}. But for the Monte Carlo EM algorithm (\code{method="MCEM"}), some of these slots have different meanings. The following slots are in addition to those in \code{"cplm"}:
+ The \code{"cpglm"} class extends \code{"cplm"} directly and is a variant of \code{\link{glm}} with additional functionality to estimate the index parameter. So most of the slots have the same definition as those in \code{\link{glm}}. But for the Monte Carlo EM algorithm (\code{method="MCEM"}), some of these slots have different meanings. The following slots are in addition to those in \code{"cplm"}:
 \describe{
     \item{\code{coefficients}:}{estimated mean parameters, class \code{"numeric"}. }
     \item{\code{residuals}:}{the working residuals, that is the residuals in the final iteration of the IWLS fit, class \code{"numeric"}}
@@ -87,22 +87,21 @@ Documented here are the class \code{"cplm"} used to repesent a compound Poisson 
     \item{\code{prior.weights}:}{the weights initially supplied, a vector of \code{1}s if none were, class \code{"NullNum"}}        
     \item{\code{y}:}{the response vector used.}
     \item{\code{control}:}{the value of the control argument used, class \code{"list"} }
-    \item{\code{theta}:}{a vecotr that records the maximized values of all parameters, class \code{"numeric"}}    
-    \item{\code{theta.all}:}{a matrix (class \code{"matrix"})that records the iteration history of all the parameters. This is meaningless if \code{method="profile"}.}
     \item{\code{p}:}{the maximum likelihood estimate of the index parameter.}    
     \item{\code{phi}:}{the maximum likelihood estimate of the dispersion parameter.}    
     \item{\code{vcov}:}{estimated variance-covariance matrix, class \code{"matrix"}}    
-    \item{\code{iter}:}{Object of class \code{"integer"}. For \code{method="profile"}, this is the number of Fisher's scoring iterations in the GLM, and for \code{method="MCEM"}, this is the number of iterations used in the MCEM algorithm.}
+    \item{\code{iter}:}{the number of Fisher's scoring iterations in the GLM.}
     \item{\code{converged}:}{indicating whether the algorithm has converged, class \code{"logical"}.}
-    \item{\code{method}:}{the method used in \code{cplm}, class \code{"character"}}
+    \item{\code{na.action}:}{method of handling \code{NA}, class \code{"NullFunc"}.}
 }    
     
 
-  The class \code{"cpglmm"} extends \code{"\linkS4class{mer}"} and \code{"cplm"}, and it has the following addtional slots (see \code{"\linkS4class{mer}"} for details of the slots not documented here):
+  The class \code{"cpglmm"} extends \code{"\linkS4class{mer}"} and \code{"cplm"}, and it has the following additional slots (see \code{"\linkS4class{mer}"} for details of the slots not documented here):
   \describe{
     \item{\code{p}:}{estimated value of the index parameter, class \code{"numeric"}  }
     \item{\code{phi}:}{estimated value of the dispersion parameter, class \code{"numeric"} }
     \item{\code{bound.p}:}{the specified bound of the index parameter, class \code{"numeric"}   }
+    \item{\code{vcov}:}{estimated variance-covariance matrix, class \code{"matrix"}}
     }
 
   The \code{"summary.cpglmm"} class \emph{contains} the \code{"cpglmm"}
@@ -115,7 +114,6 @@ Documented here are the class \code{"cplm"} used to repesent a compound Poisson 
     \item{\code{sigma}:}{the scale factor for the variance-covariance estimates}
     \item{\code{coefs}:}{the matrix of estimates, standard errors,
       etc. for the fixed-effects coefficients}
-    \item{\code{vcov}:}{the same as \code{\link{vcov}(object)}.}
     \item{\code{REmat}:}{the formatted Random-Effects matrix}
     \item{\code{AICtab}:}{A named vector of values of AIC, BIC, log-likelihood
       and deviance}
@@ -130,12 +128,14 @@ Documented here are the class \code{"cplm"} used to repesent a compound Poisson 
     \item{\code{n.sims}:}{the approximate number of simulations to keep after thinning, class \code{"integer"}}
     \item{\code{sims.list}:}{Object of class \code{"mcmc.list"}, a list of \code{n.chains} \code{mcmc} objects, each \code{mcmc} object storing the simulation result from a Markov chain. See \code{\link[coda]{mcmc}} and \code{\link[coda]{mcmc.convert}}. Since this is an \code{"mcmc.list"} object, most methods defined in the package \code{coda} can be directly applied to it. }
     \item{\code{summary}:}{Object of class \code{"summary.mcmc"}, two sets of summary statistics for each variable: Mean, standard deviation, naive standard error of the mean (ignoring autocorrelation of the chain) and time-series standard error based on an estimate of the spectral density at 0. See \code{\link[coda]{summary.mcmc}}.}
+    \item{\code{prop.var}:}{a named list of proposal variance-covariance matrix used in the Metropolis-Hasting update}
 }
 
   The class \code{"bcpglmm"} extends the class \code{"bcpglm"}, and it has the following additional slots: 
   \describe{
     \item{\code{Zt}:}{The transpose of model matrix for the random effects, stored as a compressed column-oriented sparse matrix (class \code{"dgCMatrix"}).}
     \item{\code{flist}:}{The list of grouping factors for the random effects.}
+    \item{\code{prop.var}:}{a named list of proposal variance-covariance matrix used in the Metropolis-Hasting update}
  }
   
 }
@@ -172,20 +172,20 @@ Class \code{"\linkS4class{cplm}"}, by class "bcpglm", distance 2.
     \item{formula}{\code{signature(x = "cplm")}: extract the \code{formula} slot.  See \code{\link[stats]{formula}}.}    
     \item{model.matrix}{\code{signature(object = "cplm")}: extract the design matrix.  }
     \item{show}{\code{signature(object = "cplm")}: method for \code{show}. }
+    \item{vcov}{\code{signature(object = "cplm")}: extract the variance-covariance matrix of a \code{"cplm"} object.}
  }
  
  The following methods are defined for the \code{"cpglm"} class:
   \describe{    
     \item{coef}{\code{signature(object = "cpglm")}:  extract the estimated coefficients.}
-    \item{fitted.values}{\code{signature(object = "cpglm")}:  return the fitted values.  }
-    \item{fitted}{\code{signature(object = "cpglm")}: same as \code{fitted.values} in the above. }
+    \item{fitted}{\code{signature(object = "cpglm")}: return the fitted values. }
     \item{residuals}{\code{signature(object = "cpglm")}: extract residuals  from a \code{cpglm} object. You can also specify a \code{type} argument to indicate the type of residuals to be computed. See \code{\link[stats]{glm.summaries}}.}
-    \item{resid}{\code{signature(object = "cpglm")}: same as \code{residuals}.}
-    \item{df.residual}{\code{signature(object = "cpglm")}: extract the residual degree of freedome from the \code{"cpglm"} object. See \code{\link[stats]{df.residual}}.  } 
+    \item{resid}{\code{signature(object = "cpglm")}: same as \code{residuals}.}   
     \item{AIC}{\code{signature(object = "cpglm",k="missing")}: extract the AIC information from the \code{"cpglm"} object.  See \code{\link[stats]{AIC}}.}    
     \item{deviance}{\code{signature(object = "cpglm")}: extract the deviance from the \code{"cpglm"} object.  See \code{\link[stats]{deviance}}.}
-    \item{summary}{\code{signature(object = "cpglm")}: for the profiled likelihood approach, this is the same as \code{\link[stats]{glm.summaries}} except that both the dispersion and the index parameter are estimated using maximum likelihood estimation. For \code{method="MCEM"}, a Z-test is performed that relies on the asymptotic normality of the MLE estimates.}
-    \item{vcov}{\code{signature(object = "cpglm")}: extract the variance-covariance matrix of a \code{"cpglm"} object.}
+    \item{summary}{\code{signature(object = "cpglm")}: for the profiled likelihood approach, this is the same as \code{\link[stats]{glm.summaries}} except that both the dispersion and the index parameter are estimated using maximum likelihood estimation. For \code{method="MCEM"}, a Z-test is performed that relies on the asymptotic normality of the MLE estimates.}    
+    \item{predict}{\code{signature(object = "cpglm")}: generate predictions for new data sets}
+
    }
    
    
@@ -193,6 +193,7 @@ Class \code{"\linkS4class{cplm}"}, by class "bcpglm", distance 2.
   \describe{
     \item{print}{\code{signature(x = "cpglmm")}:  print the object }
     \item{summary}{\code{signature(object = "cpglmm")}: summary results}
+    \item{predict}{\code{signature(object = "cpglmm")}: generate predictions for new data sets}
     \item{VarCorr}{\code{signature(x = "cpglmm")}: estimation for the variance components }
     \item{vcov}{\code{signature(object = "cpglmm")}: variance-covariance matrix for fixed effects }
    }

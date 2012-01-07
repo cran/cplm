@@ -1,30 +1,25 @@
-useDynLib(cplm)
+useDynLib(cplm, .registration=TRUE)
 
 ############################
 #  import 
 ############################
-
-importFrom(stats,  predict, coef, residuals, resid, 
-		fitted, fitted.values, df.residual, AIC, deviance,
-		terms, formula, model.matrix)
-importFrom(methods, show)
-importFrom(graphics, plot)
 import(Matrix)
 import(coda)
+importFrom(minqa, bobyqa)
+importMethodsFrom(methods, show)
 importClassesFrom(lme4, mer, summary.mer)
-importMethodsFrom(lme4, VarCorr, vcov)
+importMethodsFrom(lme4, VarCorr, vcov, mcmcsamp, residuals, resid,
+			fitted, terms, formula, deviance, model.matrix, 
+			coef, plot)
+importMethodsFrom(stats4, AIC)
+importMethodsFrom(amer, predict)
 
 ############################
 #  export 
 ############################
-# function 
-export(cpglm)
-export(cpglm_em)
-export(cpglm_profile)
-export(bcpglm)
-export(cpglmm)
-export(bcpglmm)
-export(igamma, iwish)
+# functions 
+export(cpglm, cpglmm, bcpglm, bcpglmm)
+export(igamma, iwish, sp2d)
 
 #Classes
 exportClasses(cplm, cpglm, cpglmm, bcpglm, bcpglmm, summary.cpglmm)
@@ -32,6 +27,6 @@ exportClasses(NullNum, NullList)
            
 #Methods
 exportMethods(summary, show,  "$", "[[", "[", names, coef, vcov, 
-              residuals, resid, fitted, fitted.values, df.residual,
+              residuals, resid, fitted, 
 		  AIC, deviance, terms, formula, model.matrix, plot,
-		  VarCorr)
+		  VarCorr,  mcmcsamp, predict)

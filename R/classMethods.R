@@ -37,24 +37,22 @@ setClass("cpglm",
     deviance="numeric",
     aic="numeric",
     control="list",
-    theta="numeric",
-    theta.all="matrix",
     p="numeric",
     phi="numeric",
-    vcov="matrix",
-    iter="integer",
-    converged="logical",
-    method="character",
-    na.action="NullFunc"),
+    iter = "integer",
+    converged = "logical",
+    na.action = "NullFunc",
+    vcov = "matrix"),
     contains = "cplm"
 )
 
 # class "cpglmm" returned from a call of cpglmm
 setClass("cpglmm", 
  representation(
-  p="numeric", 
-  phi="numeric",
-  bound.p="numeric"),
+  p = "numeric", 
+  phi = "numeric",
+  bound.p = "numeric",
+  vcov = "matrix"),
   contains = c("mer","cplm")
 )
 
@@ -66,7 +64,6 @@ setClass("summary.cpglmm",
     ngrps = "integer",
     sigma = "numeric", # scale, non-negative number
     coefs = "matrix",
-    vcov = "dpoMatrix",
     REmat = "matrix",
     AICtab= "data.frame"),
   contains = "cpglmm")
@@ -79,7 +76,8 @@ setClass("bcpglm",
     n.burnin="integer",
     n.thin="integer", 
     n.sims="integer",  
-    sims.list="mcmc.list"),
+    sims.list="mcmc.list",
+    prop.var = "list"),
   contains="cplm")
 
 # class of "bcpglmm", returned from a call to "bcpglmm"
@@ -147,7 +145,7 @@ setMethod("terms",
 setMethod("model.matrix",
     signature(object = "cplm"),
     function (object,...) 
-      model.matrix(terms(object), 
+      model.matrix(attr(object@model.frame,"terms"), 
             object@model.frame, object@contrasts)
 )
 
@@ -162,6 +160,12 @@ setMethod("show",signature(object = "cplm"),
     summary(object)                                                    
 )
 
+
+setMethod("vcov", signature(object = "cplm"),
+    function(object, ...){            
+      object@vcov
+})
+
 ################################################
 # methods defined for cpglm 
 ################################################
@@ -170,12 +174,6 @@ setMethod("coef",
           signature(object = "cpglm"),
     function (object,...) 
 	    return(object@coefficients)
-)
-
-setMethod("vcov",
-	signature(object = "cpglm"),
-    function (object,...) 
-    	return(object@vcov)
 )
 
 setMethod("residuals",
@@ -224,20 +222,7 @@ setMethod("fitted",
     function (object,...) 
       return(object@fitted.values)
 )
-		
-setMethod("fitted.values",
-    signature(object = "cpglm"),
-    function (object,...) 
-      fitted(object)
-)
-
-  	
-setMethod("df.residual",
-    signature(object = "cpglm"),
-    function (object,...) 
-      object@df.residual
-)
-
+	
 
 setMethod("AIC",
     signature(object = "cpglm",k="missing" ),
@@ -255,27 +240,22 @@ setMethod("deviance",
 
 setMethod("summary", signature(object="cpglm"),
 	function(object,...){
-    coef.beta <- coef(object)    
-    s.err <- sqrt(diag(object@vcov))    
-    err.beta <- switch(object@method, 
-                        MCEM=s.err[1:(length(s.err)-2)],
-                        profile=s.err)
+    coef.beta <- coef(object)  
+    vc <- vcov(object)
+    s.err <- sqrt(diag(vc))    
+    err.beta <- s.err
     test.value <- coef.beta/err.beta
     dn <- c("Estimate", "Std. Error")             
-    pvalue <- switch(object@method, 
-                        MCEM=2 * pnorm(-abs(test.value)),
-                        profile=2 * pt(-abs(test.value), object@df.residual))
+    pvalue <- 2 * pt(-abs(test.value), object@df.residual)
     
     coef.table <- cbind(coef.beta, err.beta, test.value, pvalue)  
-    dn2 <- switch(object@method, 
-                        MCEM=c("z value", "Pr(>|z|)"),
-                        profile=c("t value", "Pr(>|t|)"))
+    dn2 <- c("t value", "Pr(>|t|)")
     dimnames(coef.table) <- list(names(coef.beta), c(dn, dn2))
-    keep <- match(c("call", "deviance", "aic", "contrasts", "df.residual","method",  
+    keep <- match(c("call", "deviance", "aic", "contrasts", "df.residual",  
         "iter","na.action"), names(object), 0L)  
     ans <- c(object[keep], list(deviance.resid = residuals(object, 
         type = "deviance"), coefficients = coef.table, 
-        dispersion = object@phi, vcov=object@vcov, p=object@p))    
+        dispersion = object@phi, vcov=vc, p=object@p))    
     .print.cpglm.summary(ans)    
     }
 )
@@ -305,15 +285,182 @@ setMethod("summary", signature(object="cpglm"),
     if (nzchar(mess <- naprint(x$na.action))) 
         cat("  (", mess, ")\n", sep = "")
     cat("AIC: ", format(x$aic, digits = max(4, digits + 1)), "\n\n")
-    if (x$method=="MCEM")
-      cat("Number of Monte Carlo EM iterations: ", x$iter, "\n") 
-    if (x$method=="profile")
-      cat("Number of Fisher Scoring iterations: ", x$iter, "\n") 
+    cat("Number of Fisher Scoring iterations: ", x$iter, "\n") 
     cat("\n")
     invisible(x)
 }
-    
 
+# simple prediction method for cpglm
+setMethod("predict", signature(object = "cpglm"),
+  function (object, newdata, type = c("response", "link"), 
+                  na.action = na.pass, ...) {
+    tt <- attr(object@model.frame,"terms")
+    if (missing(newdata) || is.null(newdata)) {
+        X <- model.matrix(object)
+        offset <- object$offset
+    }
+    else {
+        Terms <- delete.response(tt)
+        m <- model.frame(Terms, newdata, na.action = na.action)
+        X <- model.matrix(Terms, m, contrasts.arg = object$contrasts)
+        offset <- rep(0, nrow(X))
+        if (!is.null(off.num <- attr(tt, "offset"))) 
+            for (i in off.num) offset <- offset + eval(attr(tt, 
+                "variables")[[i + 1]], newdata)
+        if (!is.null(object$call$offset)) 
+            offset <- offset + eval(object$call$offset, newdata)
+    }
+    beta <- object$coefficients
+    predictor <- X%*% beta
+    if (!is.null(offset)) 
+        predictor <- predictor + offset
+    mu <- tweedie(link.power=object@link.power)$linkinv(predictor)
+    type <- match.arg(type)                                                            
+    switch(type,link=predictor, response=mu)                                                            
+})
+
+
+# method for mcmcsamp, based on bcpglm
+setMethod("mcmcsamp",
+    signature(object = "cpglm"),
+    function(object, inits = NULL, n.chains=3, n.iter=2000, 
+        n.burnin=floor(n.iter/2),
+        n.thin=max(1, floor(n.chains * (n.iter - n.burnin) / n.sims)),
+        n.sims=1000, n.report=1000, 
+        prior.beta.mean=NULL, prior.beta.var=NULL, 
+        bound.phi=100, bound.p=c(1.01,1.99),  
+        tune.iter=4000, n.tune=10, tune.weight=0.25,
+        method="dtweedie", #prop.var = NULL,
+             ...) {
+  call <- match.call()
+  X <- model.matrix(attr(object@model.frame,"terms"), 
+            object@model.frame, object@contrasts)
+  n.obs <- nrow(X)
+  n.beta <- ncol(X)
+  # default prior info
+  if (is.null(prior.beta.mean))
+    prior.beta.mean <- rep(0, n.beta)
+  if (is.null(prior.beta.var))
+    prior.beta.var <- rep(10000, n.beta)
+ 
+ #  offset and prior wts
+  wts <- object$prior.weights 
+  off <- object$offset
+  if (is.null(wts))     
+      wts <- rep(1, n.obs)
+  if (is.null(off)) 
+        off <- rep(0, n.obs) 
+  
+  # dimensions used in simulation  
+  n.keep <- floor((n.iter-n.burnin) / n.thin)
+  n.sims <- n.chains * n.keep  
+  dims <- list(n.obs= as.integer(n.obs),
+           n.beta=as.integer(n.beta),
+           n.pos= as.integer(sum(object$y>0)),     
+           n.term = as.integer(0),
+           n.u = as.integer(0),
+           n.all = as.integer(n.beta+2),
+           n.chains=as.integer(n.chains), 
+           n.iter=as.integer(n.iter), 
+           n.burnin=as.integer(n.burnin),
+           n.thin=as.integer(n.thin), 
+           n.keep=as.integer(n.keep),
+           n.sims=as.integer(n.sims),
+           n.report=as.integer(n.report),
+           tune.iter=as.integer(tune.iter),
+           n.tune=as.integer(n.tune))
+  dims <- unlist(dims)
+ 
+  # proposal covariance matrix
+  #if (is.null(prop.var)){
+    C <- 2.38 * 2.38
+    vc <- vcov(object)
+    ebeta.var <- vc*C/n.beta
+    ephi.var <- C * attr(vc, "phi_p")[1,1]
+    ep.var <- C * attr(vc, "phi_p")[2,2]
+  #} else {
+  #  ebeta.var <- prop.var$beta.var
+  #  ephi.var <- prop.var$phi.var
+  #  ep.var <- prop.var$p.var
+  #}
+  # generate initial values if necessary
+  if (is.null(inits)) {
+      pstart <- object$p
+      betastart <- as.numeric(object$coefficients)
+      phistart <- object$phi
+		  inits.start <- c(betastart, phistart, pstart)
+		  inits <- vector("list",n.chains)
+		  inits[[1]] <- c(betastart, phistart, pstart)
+	    if (n.chains>1){
+		    for (i in 2:n.chains)
+			    inits[[i]] <- c(betastart + rnorm(n.beta,0,0.5),
+						        runif(1,phistart/2,1.5*phistart),
+						        runif(1,(bound.p[1]+pstart)/2,(bound.p[2]+pstart)/2))
+	    }
+  } else {
+    inits <- lapply(inits, function(x) c(x$beta, x$phi, x$p ))
+  }
+
+  # run MCMC   
+    # input for the C function 	     
+    input <- list(X=as.double(X),
+               y=as.double(object$y),
+               ygt0= as.integer(which(object$y>0L)-1),
+               offset=as.double(off),
+               pWt=as.double(wts),
+               mu = double(dims["n.obs"]),
+               eta = double(dims["n.obs"]),
+               inits = inits,
+               beta=as.double(inits[[1]][1:n.beta]),
+               phi=as.double(inits[[1]][n.beta+1]),
+               p=as.double(inits[[1]][n.beta+2]),
+               link.power=as.double(object$link.power),
+               pbeta.mean=as.double(prior.beta.mean),
+               pbeta.var=as.double(prior.beta.var),
+               bound.phi=as.double(bound.phi),
+               bound.p=as.double(bound.p),    
+               ebeta.var=as.double(ebeta.var),
+               ep.var= as.double(ep.var),
+               ephi.var = as.double(ephi.var),               
+               dims=dims,
+               tune.weight=as.double(tune.weight),               
+               lambda = as.double(2),
+               k = as.integer(1),
+               simT = as.integer(rep(1,dims["n.pos"])))
+  
+  if (method=="dtweedie")  
+    sims.list<- .Call("bcpglm_gibbs_tw",input) 
+  if (method=="latent")
+    sims.list<- .Call("bcpglm_gibbs_lat",input)
+  
+  # get names
+  sims.list <- lapply(sims.list, function(x){ 
+                  dimnames(x) <- list(NULL, c(dimnames(X)[[2L]],"phi","p"))
+                  return(x)})  
+  # coerce to mcmc object                  
+  sims <- lapply(sims.list, as.mcmc)
+  sims <- as.mcmc.list(sims)
+   
+  # coerce sims.list to mcmc.list from coda
+  ans <- new("bcpglm", 
+             n.chains=as.integer(n.chains), 
+             n.iter=as.integer(n.iter), 
+             n.burnin=as.integer(n.burnin),
+             n.thin=as.integer(n.thin), 
+             n.sims=as.integer(dims["n.sims"]), 
+             sims.list=sims,
+             link.power=object$link.power,
+             call=call,
+             formula=object$formula,
+             model.frame = object$model.frame,
+             contrasts=object$contrasts,
+             inits = inits,
+             prop.var = list(beta.var = matrix(input$ebeta.var,n.beta, n.beta), 
+                             phi.var = input$ephi.var,
+                             p.var = input$ep.var))  
+  return(ans)
+                  
+})        
 
 
 ################################################
@@ -338,22 +485,31 @@ setMethod("plot", signature(x="bcpglm",y="missing"),
 
 
 setMethod("vcov", signature(object = "cpglmm"),
-    function(object, ...){
-      rr <- as(object@phi *
-              chol2inv(object@RX, size = object@dims['p']), "dpoMatrix")
-      nms <- colnames(object@X)
-      dimnames(rr) <- list(nms, nms)
-      rr@factors$correlation <- as(rr, "corMatrix")
-      rr
+  function(object, ...){
+    rr <- object$phi * chol2inv(object@RX, size = object@dims['p'])
+    nms <- colnames(object@X)
+    dimnames(rr) <- list(nms, nms)
+      
+    # compute vcov for phi and p numerically 
+    cpglmm_dev <- function(x, ...){
+      parm <- c(.Call(lme4:::mer_ST_getPars, object), 
+                object$fixef, log(x[1]), x[2])
+      .Call("cpglmm_update_dev",object, parm)  
+    }
+    x <- c(object$phi, object$p)
+    hs <- hess(x, cpglmm_dev)
+    dimnames(hs) <- list(c("phi","p"),c("phi","p"))      
+    attr(rr,"phi_p") <- solve(hs)
+    rr
 })
+
 
 setMethod("VarCorr", signature(x = "cpglmm"),
     function(x, ...){
-### Create the VarCorr object of variances and covariances
-      sc <- sqrt(x@phi)
-	    ans <- lapply(cc <- .Call(lme4:::mer_ST_chol, x),
+    sc <- sqrt(x@phi)
+	  ans <- lapply(cc <- .Call(lme4:::mer_ST_chol, x),
                         function(ch) {
-                            val <-  ch %*%t(ch) # variance-covariance
+                            val <- crossprod(sc * ch) # variance-covariance
                             stddev <- sqrt(diag(val))
                             correl <- t(val / stddev)/stddev
                             diag(correl) <- 1
@@ -361,24 +517,22 @@ setMethod("VarCorr", signature(x = "cpglmm"),
                             attr(val, "correlation") <- correl
                             val
                         })
-      fl <- x@flist
-      names(ans) <- names(fl)[attr(fl, "assign")]
-      attr(ans, "sc") <- if (x@dims[["useSc"]]) sc else NA
-      ans
-    }
-)
+          fl <- x@flist
+          names(ans) <- names(fl)[attr(fl, "assign")]
+          attr(ans, "sc") <- sc
+          ans
+      })
+
 
 setMethod("summary", signature(object = "cpglmm"),
     function(object, ...){
-      REML <- object@dims[["REML"]]
       fcoef <- fixef(object)
-      vcov <- vcov(object)
-      corF <- vcov@factors$correlation
+      vcov <- object@vcov
       dims <- object@dims
-      coefs <- cbind("Estimate" = fcoef, "Std. Error" = corF@sd) #, DF = DF)
-      llik <- logLik(object, REML)
+      coefs <- cbind("Estimate" = fcoef, "Std. Error" = sqrt(diag(vcov)) )
+      llik <- logLik(object, 0)
       dev <- object@deviance
-      mType <- if((non <- as.logical(length(object@V)))) "NMM" else "LMM"
+      mType <- "LMM"
       mName <- "Compound Poisson linear"
 	    method <- paste("the", if(dims[["nAGQ"]] == 1) "Laplace" else
 			  "adaptive Gaussian Hermite","approximation")
@@ -386,36 +540,34 @@ setMethod("summary", signature(object = "cpglmm"),
       AICframe <- data.frame(AIC = AIC(llik), BIC = BIC(llik),
                                  logLik = as.vector(llik),
                                  deviance = dev[["ML"]],
-                                 REMLdev = dev[["REML"]],
                                  row.names = "")
-      if (is.na(AICframe$REMLdev)) AICframe$REMLdev <- NULL
+      
       varcor <- VarCorr(object)
       REmat <- lme4:::formatVC(varcor)
       if (is.na(attr(varcor, "sc")))
           REmat <- REmat[-nrow(REmat), , drop = FALSE]
 
       if (nrow(coefs) > 0) {
-          if (!dims[["useSc"]]) {
-                  coefs <- coefs[, 1:2, drop = FALSE]
-                  stat <- coefs[,1]/coefs[,2]
-                  pval <- 2*pnorm(abs(stat), lower = FALSE)
-                  coefs <- cbind(coefs, "z value" = stat, "Pr(>|z|)" = pval)
-              } else {
-                  stat <- coefs[,1]/coefs[,2]
-                  ##pval <- 2*pt(abs(stat), coefs[,3], lower = FALSE)
-                  coefs <- cbind(coefs, "t value" = stat) #, "Pr(>|t|)" = pval)
-              }
-          } ## else : append columns to 0-row matrix ...
-          new("summary.cpglmm",
+        if (!dims[["useSc"]]) {
+          coefs <- coefs[, 1:2, drop = FALSE]
+          stat <- coefs[,1]/coefs[,2]
+          pval <- 2*pnorm(abs(stat), lower = FALSE)
+          coefs <- cbind(coefs, "z value" = stat, "Pr(>|z|)" = pval)
+        } else {
+          stat <- coefs[,1]/coefs[,2]
+          ##pval <- 2*pt(abs(stat), coefs[,3], lower = FALSE)
+          coefs <- cbind(coefs, "t value" = stat) #, "Pr(>|t|)" = pval)
+        }
+      } 
+      new("summary.cpglmm",
               object,
               methTitle = paste(mName, "mixed model fit by", method),
               logLik = llik,
               ngrps = sapply(object@flist, function(x) length(levels(x))),
               sigma = sqrt(object@phi),
               coefs = coefs,
-              vcov = vcov,
               REmat = REmat,
-              AICtab= AICframe)
+              AICtab = AICframe)
   }
 )
 
@@ -424,7 +576,6 @@ print.cpglmm <- function(x, digits = max(3, getOption("digits") - 3),
                      correlation = FALSE, symbolic.cor = FALSE,
                      signif.stars = getOption("show.signif.stars"), ...){
     so <- summary(x)
-    REML <- so@dims[["REML"]]
     llik <- so@logLik
     dev <- so@deviance
     dims <- x@dims
@@ -486,4 +637,253 @@ setMethod("show", "cpglmm",
   function(object) 
     print.cpglmm(object)
 )
+
+
+# predict method for cpglmm
+getZt <- function(formula, oldmf, newmf){
+  bars <- lme4:::expandSlash(lme4:::findbars(formula[[3]]))
+  names(bars) <- unlist(lapply(bars, function(x) deparse(x[[3]])))
+  fl <- lapply(bars, function(x) {
+        oldlvl <- eval(substitute(levels(as.factor(fac)[, drop = TRUE]), 
+            list(fac = x[[3]])), oldmf)
+        ff <- eval(substitute(factor(fac,levels=oldlvl)[, drop = TRUE], 
+            list(fac = x[[3]])), newmf)
+        # fill columns of 0's if some levels are missing
+        im <- as(ff, "sparseMatrix")
+        im2 <- Matrix(0,nrow=length(oldlvl),ncol=length(ff),sparse=T)
+        # this is awkward as the Matrix package seems to fail
+        for (i in 1:nrow(im)){
+          ind <- match(rownames(im)[i],oldlvl)
+          im2[as.numeric(ind),] <- im[as.numeric(i),]            
+        }        
+        if (!isTRUE(validObject(im, test = TRUE))) 
+            stop("invalid conditioning factor in random effect: ", 
+                format(x[[3]]))
+        mm <- model.matrix(eval(substitute(~expr, list(expr = x[[2]]))), newmf)
+        mm <- mm[!is.na(ff),,drop=F]
+        Zt <- do.call(rBind, lapply(seq_len(ncol(mm)), 
+            function(j) {
+                im2@x <- mm[, j]
+                im2
+            }))
+        ans <- list(f = oldlvl, Zt=Zt)       
+        ans
+    })
+  nlev <- sapply(fl, function(el) length(levels(el$f)))
+  if (any(diff(nlev)) > 0) 
+        fl <- fl[rev(order(nlev))]        
+  Zt <- do.call(rBind,lapply(fl,"[[","Zt"))
+  Zt
+}         
+
+setMethod("predict", signature(object = "cpglmm"),
+    function(object,  newdata, type = c("link","response"), 
+          na.action = na.pass, ...) {
+    tt <- attr(object@model.frame,"terms")
+    if (missing(newdata) || is.null(newdata)) {
+        mm <- X <- model.matrix(object)
+        Zt <- object@Zt
+        offset <- object$offset
+    }
+    else {
+        Terms <- delete.response(tt)
+        # design matrix for fixed effects
+        X <- model.matrix(Terms, newdata, contrasts.arg = object@contrasts)
+        # design matrix for random effects
+        formula <- object@formula
+        oldmf <- object@model.frame
+        Zt <- getZt(formula, oldmf, newdata)        
+        # get offset
+        offset <- rep(0, nrow(X))
+        if (!is.null(off.num <- attr(tt, "offset"))) 
+            for (i in off.num) offset <- offset + eval(attr(tt, 
+                "variables")[[i + 1]], newdata)
+        if (!is.null(object$call$offset)) 
+            offset <- offset + eval(object$call$offset, newdata)                
+    }
+    beta <- object@fixef
+    u <- object@ranef
+    predictor <- as.numeric(X %*% beta + t(Zt)%*% u)
+    if (!is.null(offset)) 
+        predictor <- predictor + offset
+    mu <- tweedie(link.power=object@link.power)$linkinv(predictor)
+    type <- match.arg(type)
+    switch(type,link=predictor, response=mu)   
+})
+
+
+# methods for mcmcsamp, based on bcpglmm
+setMethod("mcmcsamp",
+    signature(object = "cpglmm"),
+    function(object, inits = NULL, n.chains=3, n.iter=2000, 
+        n.burnin=floor(n.iter/2),
+        n.thin=max(1, floor(n.chains * (n.iter - n.burnin) / n.sims)),
+        n.sims=1000, n.report=1000, 
+        prior.beta.mean=NULL, prior.beta.var=NULL, 
+        bound.phi=100, bound.p=c(1.01,1.99),  prior.Sigma = NULL,
+        tune.iter=4000, n.tune=10, tune.weight=0.25,
+        method="dtweedie", #prop.var = NULL, 
+             ...) {
+  call <- match.call()
+  dd <- object$dims
+  n.obs <- as.integer(dd['n'])
+  n.beta <- as.integer(dd['p'])
+  # default prior info
+  if (is.null(prior.beta.mean))
+    prior.beta.mean <- rep(0, n.beta)
+  if (is.null(prior.beta.var))
+    prior.beta.var <- rep(10000, n.beta)
+  if (is.null(prior.Sigma))
+    prior.Sigma <- prior.Sigma.default(object$ST)
+ 
+ #  offset and prior wts
+  wts <- object$pWt 
+  off <- object$offset
+  
+  # dimensions used in simulation
+  nc <- unlist(lapply(object$ST, ncol))
+  nlev <- diff(object$Gp)/nc  
+  n.keep <- floor((n.iter-n.burnin) / n.thin)
+  n.sims <- n.chains * n.keep 
+  dims <- list(n.obs= n.obs,
+           n.beta=as.integer(unname(n.beta)),           
+           n.pos= as.integer(sum(object$y>0)),
+           n.term = as.integer(dd['nt']),
+           n.u = as.integer(dd['q']),
+           n.all = as.integer(dd['p'] + dd['q'] + sum(nc^2)+2),
+           n.chains=as.integer(n.chains), 
+           n.iter=as.integer(n.iter), 
+           n.burnin=as.integer(n.burnin),
+           n.thin=as.integer(n.thin), 
+           n.keep=as.integer(n.keep),
+           n.sims=as.integer(n.sims),
+           n.report=as.integer(n.report),
+           tune.iter=as.integer(tune.iter),
+           n.tune=as.integer(n.tune))
+  dims <- unlist(dims)
+  
+  # proposal covariance matrix              
+  #if (is.null(prop.var)){
+    C <- 2.38 * 2.38
+    vc <- vcov(object)
+    ebeta.var <- vc * C /n.beta
+    tmp <- unlist(lapply(ranef(object, postVar=T), 
+                       function(x) as.numeric(attr(x, 'postVar'))))
+    eu.var <- diag(as.numeric(tmp), nrow=dd['q']) * C/dd['q']
+    ephi.var <- C * attr(vc, "phi_p")[1,1]
+    ep.var <- C * attr(vc, "phi_p")[2,2]
+  #} else {
+  #  ebeta.var <- prop.var$beta.var
+  #  eu.var <- prop.var$u.var
+  #  ephi.var <- prop.var$phi.var
+  #  ep.var <- prop.var$p.var
+  #}
+
+                   
+  # generate initial values 
+  if (is.null(inits)) {
+    pstart <- object$p
+    betastart <- as.numeric(fixef(object))
+    ustart <- lapply(ranef(object), function(t) as.numeric(unlist(t)))
+    ustart <- as.numeric(unlist(ustart))
+    phistart <- object$phi
+    Sigmastart <- lapply(object$ST,function(x) x%*%t(x))
+    Sigmastartv <- unlist(lapply(Sigmastart, as.numeric))
+    inits.start <- c(betastart, phistart, pstart, ustart, Sigmastartv)
+    inits <- vector("list",n.chains)
+    inits[[1]] <- c(betastart, phistart, pstart, ustart, Sigmastartv)
+	  if (n.chains>1){
+		  for (i in 2:n.chains)
+			  inits[[i]] <- c(as.numeric(betastart + rnorm(n.beta,0,0.5)),
+						        runif(1,phistart/2,1.5*phistart),
+						        runif(1,(bound.p[1]+pstart)/2,(bound.p[2]+pstart)/2),
+                    ustart+rnorm(length(ustart),0,0.5) ,
+                    Sigmastartv)
+	  }
+  } else{
+    betastart <- inits[[1]]$beta
+    phistart <- inits[[1]]$phi
+    pstart <- inits[[1]]$p
+    ustart <- inits[[1]]$u
+    Sigmastart <- inits[[1]]$Sigma
+    inits <- lapply(inits, function(x) c(x$beta, x$phi, x$p, x$u,
+                                      unlist(lapply(x$Sigma, as.numeric))))
+  }
+
+  # run MCMC   
+  # input for the C function 	     
+  input <- list(X=object$X,
+               y=as.double(object$y),
+               Zt = object$Zt, 
+               ygt0= as.integer(which(object$y>0L)-1),
+               offset=as.double(off),
+               pWt=as.double(wts),
+               mu = double(dims["n.obs"]),
+               eta = double(dims["n.obs"]),
+               inits = inits,
+               beta=as.double(betastart),
+               u= as.double(ustart),
+               phi=as.double(phistart),
+               p=as.double(pstart),
+               link.power=as.double(object$link.power),
+               pbeta.mean=as.double(prior.beta.mean),
+               pbeta.var=as.double(prior.beta.var),
+               pSigma = prior.Sigma,
+               bound.p=as.double(bound.p),
+               bound.phi=as.double(bound.phi),    
+               ebeta.var=as.double(ebeta.var),
+               eu.var = as.double(eu.var),    
+               ep.var= as.double(ep.var),
+               ephi.var = as.double(ephi.var),               
+               dims=dims,
+               tune.weight=as.double(tune.weight),
+               Gp = unname(object$Gp),
+               Sigma = Sigmastart,
+               ncol = as.integer(nc), 
+               nlev = as.integer(nlev),
+               lambda = as.double(2),
+               k = as.integer(1),
+               simT = as.integer(rep(1,dims["n.pos"])),
+               mh.var = c(diag(ebeta.var), diag(eu.var), ephi.var, ep.var))
+
+  if (method=="dtweedie")
+    sims.list<- .Call("bcpglmm_gibbs_tw",input) 
+  if (method=="latent")
+    sims.list<- .Call("bcpglmm_gibbs_lat",input)
+  xnames <- names(fixef(object))
+  unames <- paste("u", 1:dd['q'],sep="")
+  snames <- sapply(1:length(object$ST), function(x){
+              tm <- apply(expand.grid(1:nc[x],1:nc[x]),1,
+                          paste, collapse=",")
+              paste("Sigma",x,"[",tm,"]",sep="")
+  })
+  snames <- unlist(snames)
+  sims.list <- lapply(sims.list, function(x){ 
+                  dimnames(x) <- list(NULL, 
+                      c(xnames,"phi","p",unames,snames))
+                  return(x)}) 
+  # coerce to mcmc object                  
+  sims <- lapply(sims.list, as.mcmc)
+  sims <- as.mcmc.list(sims)
+ 
+  # coerce sims.list to mcmc.list from coda
+  ans <- new("bcpglmm", 
+             n.chains=as.integer(n.chains), 
+             n.iter=as.integer(n.iter), 
+             n.burnin=as.integer(n.burnin),
+             n.thin=as.integer(n.thin), 
+             n.sims=as.integer(dims["n.sims"]), 
+             sims.list=sims,
+             link.power=object$link.power,
+             call=call,
+             formula= object$formula,
+             model.frame = object$model.frame,
+             contrasts=object$contrasts,
+             inits = inits,
+             prop.var = list(beta.var = matrix(input$ebeta.var,n.beta,n.beta), 
+                             u.var = matrix(input$eu.var,dd['q'],dd['q']),
+                             phi.var = input$ephi.var,
+                             p.var = input$ep.var))  
+  return(ans)
                   
+})

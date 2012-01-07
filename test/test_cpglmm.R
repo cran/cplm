@@ -1,28 +1,36 @@
 if (FALSE){
 
 cpglmm <- function(formula, link="log", data, weights, offset,
-                  subset, na.action, betastart=NULL, phistart=NULL, 
-                  pstart=NULL, contrasts = NULL, control = list()) {}
+                  subset, na.action, inits=NULL,
+                   contrasts = NULL, control = list(),
+                   basisGenerators = c("tp","tpU","bsp","sp2d")) {}
     
 library(ggplot2)
 library(lme4)
+library(amer)
 library(tweedie)
 
 setwd("C:\\Documents and Settings\\cab2007\\My Documents\\2011\\cplm")
 
 load("./data/fineroot.RData")
 source("R/cpglm.R")
-source("R/cpglmm.R")
+#source("R/cpglmm.R")
 source("R/bcpglm.R")
 source("R/classMethods.R")
+source("R/utilities.R")
+source("R/spline.R")
 dyn.load("src/cplm.dll")
 dyn.unload("src/cplm.dll")
 
-call <- match.call(cpglmm,call("cpglmm",RLD~  Zone*Stock + (1|Plant), 
-            link="log", data = fineroot))  
-formula <-   RLD~   Zone*Stock + (1|Plant)
+
+fineroot$x1 <- rnorm(nrow(fineroot))
+fineroot$x2 <- rnorm(nrow(fineroot))
+call <- amer:::expand.call(cpglmm,call("cpglmm",RLD~  Stock + Spacing +  (1|Plant) + (1|Zone), 
+             data = fineroot))
+formula <-   RLD~   Stock + Spacing +  (1|Plant) + (1|Zone)
 link <- "log"
 control <- list()
+contrasts <- NULL
 
 dyn.load("src/cpglmm_lap.dll")  
 a=.Call("init")

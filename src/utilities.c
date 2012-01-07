@@ -13,6 +13,10 @@
 
 #include "cplm.h"
 
+/** constant used in numerical differentiation */
+#define DIFF_EPS 0.001
+
+extern  cholmod_common c;
 
 /************************************************************/
 /*          Memory allocation utility functions             */
@@ -572,22 +576,50 @@ void cplm_mu_eta(double *mu, double* muEta, int nO,
 }
 
 /**
- * update the eta, mu and d(mu)/d(eta) in cpglm
+ * update the eta and mu in cpglm according to beta
  *
- * @param eta pointer to the vector of linear predictors
- * @param mu pointer to the vector of expected values
- * @param muEta pointer to the vector of d(mu)/d(eta)
- * @param dap pointer to a da_parm struct
+ * @param da pointer to a SEXP struct
  *
  */
 
-void cpglm_fitted(double *eta, double *mu, double *muEta,
-                 da_parm *dap){
-    cpglm_eta(eta, dap->nO, dap->nB, dap->X, dap->beta,
-             dap->offset) ;
-    cplm_mu_eta(mu, muEta, dap->nO, eta, dap->link_power);
+void cpglm_fitted(SEXP da){
+    int *dm = DIMS_ELT(da) ;
+    int nO = dm[nO_POS], nB = dm[nB_POS];
+    double *X = X_ELT(da),
+        *beta = BETA_ELT(da), *eta = ETA_ELT(da),
+        *mu = MU_ELT(da), *offset = OFFSET_ELT(da), 
+        link_power = LKP_ELT(da)[0] ;
+   
+    // eta = X %*% beta	
+    mult_mv("N", nO, nB, X, beta, eta) ;
+    // eta = eta + offset
+    for (int i=0;i<nO;i++){
+        eta[i] += offset[i] ;
+        mu[i] = linkInv(eta[i], link_power);
+    }
 }
 
+
+/**
+ * update the eta and mu in cpglm according to x
+ *
+ * @param x a vector that stores the beta to be used in updating
+ * @param da pointer to a SEXP struct
+ *
+ */
+void cpglm_fitted_x(double *x, SEXP da){
+    int *dm = DIMS_ELT(da) ;
+    int nB = dm[nB_POS];
+    double *beta = BETA_ELT(da),
+        *beta_old = Alloca(nB, double) ;
+    R_CheckStack() ;
+    // copy old_beta in da 
+    Memcpy(beta_old, beta, nB) ;
+    Memcpy(beta, x, nB) ;
+    cpglm_fitted(da) ;
+    // restore old beta
+    Memcpy(beta, beta_old, nB) ;
+}
 
 /**
  * update the power variance function
@@ -602,6 +634,133 @@ void cplm_varFun(double* var, double* mu, int n, double p){
   int i ;
   for (i=0;i<n;i++)
     var[i] = varFun(mu[i], p) ;
+}
+
+
+/************************************************/
+/*      Some utility functions in bcpglmm       */  
+/************************************************/
+
+/**
+ * Compute the mean in cpglmm
+ *
+ * @param da a list object
+ *
+ */
+void cpglmm_fitted(SEXP da){    
+    int *dm = DIMS_ELT(da) ;
+    int nO = dm[nO_POS], nB = dm[nB_POS], i1 = 1  ;
+    double *offset= OFFSET_ELT(da), *X = X_ELT(da),
+        *link_power = LKP_ELT(da), *beta = BETA_ELT(da),
+        *eta = ETA_ELT(da), *mu = MU_ELT(da), one[] = {1,0};
+    CHM_DN ceta, u = AS_CHM_DN(getListElement(da,"u"));
+    CHM_SP Zt = Zt_ELT(da);
+    R_CheckStack();
+    // update eta
+    Memcpy(eta, offset, nO);
+    // eta := eta + X * beta 
+    F77_CALL(dgemv)("N", &nO, &nB, one, X, &nO,
+		    beta, &i1, one, eta, &i1);
+    ceta = N_AS_CHM_DN(eta, nO, 1);
+    R_CheckStack();
+    if (!M_cholmod_sdmult(Zt, 1 , one, one, u, ceta, &c))
+        error(_("cholmod_sdmult error returned"));
+    // update mu
+    cplm_mu_eta(mu, (double *) NULL, nO, eta, *link_power) ;
+}
+
+
+/**
+ * Compute the mean in cpglmm at a given vector of beta's 
+ *
+ * @param x a vector that stores values of beta's
+ * @param da a list object
+ *
+ */
+void cpglmm_fitted_bx(double *x, SEXP da){    
+    int *dm = DIMS_ELT(da) ;
+    int  nB = dm[nB_POS] ;
+    double *beta = BETA_ELT(da),
+        *beta_old = Alloca(nB, double) ;
+    R_CheckStack() ;    
+    // update mu
+    Memcpy(beta_old, beta, nB) ;
+    Memcpy(beta, x, nB) ;
+    cpglmm_fitted(da) ;
+    Memcpy(beta, beta_old, nB) ;
+}
+
+
+
+/**
+ * Compute the mean in cpglmm at a given vector of beta's 
+ *
+ * @param x a vector that stores values of u's
+ * @param da a list object
+ *
+ */
+void cpglmm_fitted_ux(double *x, SEXP da){    
+    int *dm = DIMS_ELT(da) ;
+    int  nU = dm[nU_POS] ;
+    double *u = U_ELT(da),
+        *u_old = Alloca(nU, double) ;
+    R_CheckStack() ;    
+    Memcpy(u_old, u, nU) ;
+    Memcpy(u, x, nU);
+    cpglmm_fitted(da) ;
+    Memcpy(u, u_old, nU) ;
+}
+
+/**
+ * Set parameter to the k_th initial values provided in the inits slot
+ *
+ * @param da a list object
+ * @param k indicates the k_th set of initial values
+ *
+ */
+void bcpglmm_set_init(SEXP da, int k){
+    int *dm = DIMS_ELT(da) ;
+    int i, pos = 0, nB = dm[nB_POS], nU = dm[nU_POS],
+        nT = dm[nT_POS], *nc = NCOL_ELT(da);
+    SEXP inits = getListElement(da, "inits"),
+        Sig = getListElement(da, "Sigma");
+    double *Sigi, *init = REAL(VECTOR_ELT(inits,k));
+    Memcpy(BETA_ELT(da),init, nB) ;
+    PHI_ELT(da)[0] = init[nB] ;
+    P_ELT(da)[0] = init[nB+1];
+    Memcpy(U_ELT(da),init+nB+2, nU) ;
+    for (i=0;i<nT;i++){
+        Sigi = REAL(VECTOR_ELT(Sig,i)) ;
+        Memcpy(Sigi, init+nB+2+nU+pos, nc[i]*nc[i]) ;
+        pos += nc[i]*nc[i] ;
+    }    
+}
+
+/**
+ * Set parameter to the ns_th column of the simulation results
+ *
+ * @param da a list object
+ * @param ns indicates the ns_th column
+ * @param sims matrix to store simulations results 
+ *
+ */
+void bcpglmm_set_sims(SEXP da, int ns, double **sims){
+    SEXP Sig = getListElement(da, "Sigma");
+    int *dm = DIMS_ELT(da) ;
+    int i, pos = 0, nB = dm[nB_POS], nU = dm[nU_POS],
+        nT = dm[nT_POS], *nc = NCOL_ELT(da);
+    double *Sigi ;
+    for (i=0;i<nB;i++)
+        sims[ns][i] = BETA_ELT(da)[i];
+    sims[ns][nB] = PHI_ELT(da)[0] ;
+    sims[ns][nB+1] = P_ELT(da)[0] ;
+    for (i=0;i<nU;i++)
+        sims[ns][nB+2+i] = U_ELT(da)[i];
+    for (i=0;i<nT;i++){
+        Sigi = REAL(VECTOR_ELT(Sig, i));
+        Memcpy(sims[ns]+nB+2+nU+pos,Sigi, nc[i]*nc[i]) ;
+        pos += nc[i]*nc[i] ;
+        } 
 }
 
 
@@ -1006,4 +1165,57 @@ void rwishart(int d, double nu, double *scal, double *out)
     PutRNGstate();
     Free(tmp) ;
     Free(scCp) ;
+}
+
+/**
+ * Compute numerical gradient 
+ *
+ * @param n length of parmaters
+ * @param x values at which to evaluate the gradient
+ * @param myfunc user specified function 
+ * @param data struct used in myfunc
+ * @param ans vector to store the gradient 
+ *
+ */
+
+void grad(int n, double *x, 
+          double (*myfunc)(double *x, void *data), 
+          void *data, double *ans){
+    double y1, y2 ;
+    for (int i = 0; i < n; i++){
+        x[i] += DIFF_EPS ;
+        y1 = myfunc(x, data) ;
+        x[i] -= 2 * DIFF_EPS ;        
+        y2 = myfunc(x, data) ;
+        ans[i] = (y1 - y2) / DIFF_EPS * 0.5 ;
+        x[i] += DIFF_EPS ;
+    }
+}
+
+
+/**
+ * Compute numerical hessian matrix  
+ *
+ * @param n length of parmaters
+ * @param x values at which to evaluate the hessian
+ * @param myfunc user specified function 
+ * @param data struct used in myfunc
+ * @param ans n*n vector to store the hessian matrix 
+ *
+ */
+void hess(int n, double *x, 
+          double (*myfunc)(double *x, void *data), 
+          void *data, double *ans){
+    double *y1 = Calloc(n, double),
+        *y2 = Calloc(n, double)  ;
+    for (int i = 0; i < n; i++){
+        x[i] += DIFF_EPS ;
+        grad(n, x, myfunc, data, y1) ;
+        x[i] -= 2 * DIFF_EPS ;
+        grad(n, x, myfunc, data, y2) ;
+        for (int j = 0; j < n; j++)
+            ans[j + i * n] = (y1[j] - y2[j]) / DIFF_EPS * 0.5 ;
+        x[i] += DIFF_EPS ;
+    }
+    Free(y1) ; Free(y2) ;
 }

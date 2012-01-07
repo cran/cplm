@@ -17,6 +17,8 @@ source("R/cpglm.R")
 source("R/cpglmm.R")
 source("R/bcpglmm.R")
 source("R/classMethods.R")
+source("R/utilities.R")
+
 
 #dyn.load("./src/cplm.so")
 link="log"

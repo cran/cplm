@@ -14,48 +14,29 @@ bcpglm <- function(formula, link = "log", data, inits = NULL,
   call <- match.call()  
   if (missing(data)) 
     data <- environment(formula)   
-  mf <- match.call(expand.dots = FALSE)
-  # construct model frame
-  m <- match(c("formula", "data", "subset", "weights",
-               "na.action", "offset"), names(mf), 0L)
-  mf <- mf[c(1L, m)]
-  mf$drop.unused.levels <- TRUE
-  mf[[1L]] <- as.name("model.frame")
-  mf <- eval(mf, parent.frame())
-  mt <- attr(mf, "terms")
-  Y <- model.response(mf, "any")
-  X <- if (!is.empty.model(mt)) 
-        model.matrix(mt, mf, contrasts)
-  weights <- as.vector(model.weights(mf))
-  offset <- as.vector(model.offset(mf))
-  link.power <- make.link.power(link)  
-  n.obs <- NROW(X)
-  n.beta <- NCOL(X)
+  fr <- cpglm.mf(call, contrasts)
+  link.power <- make.link.power(link)
+  n.obs <- NROW(fr$X)
+  n.beta <- NCOL(fr$X)
   
   # check arguments
-  check.args.bcplm(call,n.beta, n.chains)
+  check.args.bcplm(call, n.beta, n.chains)
   # check initial values
   if (!is.null(inits))
-    check.inits.bcpglm(inits,n.beta, n.chains)  
+    check.inits.bcpglm(inits, n.beta, n.chains)  
   		  
   # default prior mean and var if missing           
   if (is.null(prior.beta.mean))
     prior.beta.mean <- rep(0, n.beta)			
   if (is.null(prior.beta.var))
   	prior.beta.var <- rep(10000, n.beta)
-  
-  # default weights and offset
-  if (is.null(weights))     
-      weights <- rep(1, n.obs)
-  if (is.null(offset)) 
-        offset <- rep(0, n.obs)   
      
   # dimensions used in simulation  
   n.keep <- floor((n.iter-n.burnin) / n.thin)
   n.sims <- n.chains * n.keep  
   dims <- list(n.obs= as.integer(n.obs),
            n.beta=as.integer(n.beta),
-           n.pos= as.integer(sum(Y>0)),     
+           n.pos= as.integer(sum(fr$Y>0)),     
            n.term = as.integer(0),
            n.u = as.integer(0),
            n.all = as.integer(n.beta+2),
@@ -77,10 +58,9 @@ bcpglm <- function(formula, link = "log", data, inits = NULL,
      
   # generate initial values if necessary
   if (is.null(inits)) {
-       # generating starting values and scale matrix in metropolis update 
-      fit.start <- cpglm_profile(X=X,Y=Y,weights=weights,offset=offset,
-                  link.power=link.power, intercept=attr(mt, "intercept") > 0L)
-                      
+       # generating starting values and scale matrix in metropolis update
+      ctr <- do.call("cpglm.control", list())
+      fit.start <-  cpglm.profile(fr, link.power, ctr)                      
       pstart <- fit.start$p
       betastart <- as.numeric(fit.start$coefficients)
       phistart <- fit.start$phi
@@ -103,11 +83,11 @@ bcpglm <- function(formula, link = "log", data, inits = NULL,
 
   # run MCMC   
     # input for the C function 	     
-    input <- list(X=as.double(X),
-               y=as.double(Y),
-               ygt0= as.integer(which(Y>0L)-1),
-               offset=as.double(offset),
-               pWt=as.double(weights),
+    input <- list(X=as.double(fr$X),
+               y=as.double(fr$Y),
+               ygt0= as.integer(which(fr$Y>0L)-1),
+               offset=as.double(fr$off),
+               pWt=as.double(fr$wts),
                mu = double(dims["n.obs"]),
                eta = double(dims["n.obs"]),
                inits = inits,
@@ -123,16 +103,19 @@ bcpglm <- function(formula, link = "log", data, inits = NULL,
                ep.var= as.double(ep.var),
                ephi.var = as.double(ephi.var),               
                dims=dims,
-               tune.weight=as.double(tune.weight))
+               tune.weight=as.double(tune.weight),               
+               lambda = as.double(2),
+               k = as.integer(1),
+               simT = as.integer(rep(1,dims["n.pos"])))
   
-  if (method=="dtweedie")
+  if (method=="dtweedie")  
     sims.list<- .Call("bcpglm_gibbs_tw",input) 
   if (method=="latent")
     sims.list<- .Call("bcpglm_gibbs_lat",input)
   
   # get names
   sims.list <- lapply(sims.list, function(x){ 
-                  dimnames(x) <- list(NULL, c(dimnames(X)[[2L]],"phi","p"))
+                  dimnames(x) <- list(NULL, c(dimnames(fr$X)[[2L]],"phi","p"))
                   return(x)})  
   # coerce to mcmc object                  
   sims <- lapply(sims.list, as.mcmc)
@@ -149,9 +132,12 @@ bcpglm <- function(formula, link = "log", data, inits = NULL,
              link.power=link.power,
              call=call,
              formula=formula,
-             model.frame = mf,
+             model.frame = fr$mf,
              contrasts=contrasts,
-             inits = inits)  
+             inits = inits,
+             prop.var = list(beta.var = matrix(input$ebeta.var,n.beta,n.beta), 
+                             phi.var = input$ephi.var,
+                             p.var = input$ep.var))  
   return(ans)
 }
 
