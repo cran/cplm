@@ -1,28 +1,32 @@
 /************************************************************/
 /*   Function for fitting the Compound Poisson Generalized  */
-/*    Linear Mixed models using Laplace approximation       */
-/*    This is based the code from the R package lme4.       */
+/*    Linear Mixed models using the Laplace approximation   */
+/*    and the adaptive Gaussian-Hermite quadrature method.  */
+/*    This is based on the code from the lme4 package.      */
 /*              Author:  Wayne Zhang                        */
 /*            actuary_zhang@hotmail.com                     */
 /************************************************************/
 
 
 /**
- * @file cpglmm_lap.c
- * @brief Function for the Laplacian approximation in the        
+ * @file cpglmm.c
+ * @brief Functions that provide the Laplacian approximation  
+ * and the adaptive Gaussian-Hermite quadrature methods for the         
  * Compound Poisson Generalized Linear Mixed Model.        
  * The program is based on the C code from lme4, where    
  * I removed the unnecessary pieces for linear mixed      
- * model and nonlinear model, and changed the code for    
- * updating the mean and the deviance and optimization     
+ * models and nonlinear models, and changed the code for    
+ * updating the mean and the deviance and optimization. 
+ * The compound Poisson density approximation method is used 
+ * for computing the loglikelihood.      
  * @author Wayne Zhang                        
- * @date 2011-10-15    
 */
 
-#include "cplm.h"
-#include <R_ext/stats_package.h> /* for S_nlminb_iterate */
-#include "Matrix.h"		 /* for cholmod functions */
-
+#include "common.h"                /* for common include headers */ 
+#include "tweedie.h"               /* for evaluating tweedie densities */
+#include "utilities.h"             /* for utility functions */
+#include "cpglmm.h"                  /* prototypes */
+#include <R_ext/stats_package.h>   /* for S_nlminb_iterate declarations */
 
 /** cholmod_common struct initialized  */
 extern cholmod_common c;
@@ -35,10 +39,9 @@ extern cholmod_common c;
 /** Minimum step factor in update_u */
 #define CM_SMIN     1e-5
 
-
 /** positions in the deviance vector */
 enum devP {
-    ML_POS=0,			/**<Maximum likelihood estimation criterion  */
+    ML_POS = 0,			/**<Maximum likelihood estimation criterion  */
     REML_POS,			/**<REML criterion */
     ldL2_POS,			/**<2*log-determinant of L */
     ldRX2_POS,			/**<2*log-determinant of RX */
@@ -55,7 +58,7 @@ enum devP {
 
 /** positions in the dims vector */
 enum dimP {
-    nt_POS=0,			/**<number of terms in random effects */
+    nt_POS = 0,			/**<number of terms in random effects */
     n_POS,			/**<number of observations */
     p_POS,			/**<number of fixed-effects parameters */
     q_POS,			/**<number of random effects */
@@ -76,121 +79,6 @@ enum dimP {
 };
 
 /**
- * Extract the slot named nm from the object obj and return a null pointer
- * if the slot has length 0 or a pointer to the REAL contents.
- *
- * @param obj pointer to an S4 object
- * @param str pointer to a symbol naming the slot to extract
- *
- * @return pointer to the REAL contents, if nonzero length, otherwise
- * a NULL pointer
- *
- */
-static R_INLINE double *SLOT_REAL_NULL(SEXP obj, char *str)
-{
-    SEXP pt = GET_SLOT(obj, install(str));
-    return LENGTH(pt) ? REAL(pt) : (double*) NULL; 
-}
-
-/** Return the double pointer to the X slot */
-#define X_SLOT(x) SLOT_REAL_NULL(x, "X")
-
-/** Return the double pointer to the y slot */
-#define Y_SLOT(x) SLOT_REAL_NULL(x, "y")
-
-/** Allocate (alloca) a cholmod_sparse struct, populate it with values
- * from the Zt slot and return the pointer. */
-#define Zt_SLOT(x) AS_CHM_SP(GET_SLOT(x, install("Zt")))
-
-/** Return the double pointer to the offset slot or (double*) NULL if
- * offset has length 0) */
-#define OFFSET_SLOT(x) SLOT_REAL_NULL(x, "offset")
-
-/** Return the double pointer to the pWt slot or (double*) NULL if
- * pWt has length 0) */
-#define PWT_SLOT(x) SLOT_REAL_NULL(x, "pWt")
-
-/** Return the integer pointer to the dims slot */
-#define DIMS_SLOT(x) INTEGER(GET_SLOT(x, install("dims")))
-
-/** Return the double pointer to the fixef slot */
-#define FIXEF_SLOT(x) SLOT_REAL_NULL(x, "fixef")
-
-/** Return the double pointer to the u slot */
-#define U_SLOT(x) SLOT_REAL_NULL(x, "u")
-
-/** Return the double pointer to the eta slot */
-#define ETA_SLOT(x) SLOT_REAL_NULL(x, "eta")
-
-/** Return the double pointer to the mu slot */
-#define MU_SLOT(x) SLOT_REAL_NULL(x, "mu")
-
-/** Return the double pointer to the muEta slot or (double*) NULL if
- * muEta has length 0) */
-#define MUETA_SLOT(x) SLOT_REAL_NULL(x, "muEta")
-
-/** Return the double pointer to the var slot or (double*) NULL if
- * var has length 0) */
-#define VAR_SLOT(x) SLOT_REAL_NULL(x, "var")
-
-/** Return the double pointer to the resid slot */
-#define RESID_SLOT(x) SLOT_REAL_NULL(x, "resid")
-
-/** Allocate (alloca) a cholmod_sparse struct, populate it with values
- * from the A slot and return the pointer. */
-#define A_SLOT(x) AS_CHM_SP(GET_SLOT(x, install("A")))
-
-/** Allocate (alloca) a cholmod_factor struct, populate it with values
- * from the L slot and return the pointer. */
-#define L_SLOT(x) AS_CHM_FR(GET_SLOT(x, install("L")))
-
-/** Return the integer pointer to the Gp slot */
-#define Gp_SLOT(x) INTEGER(GET_SLOT(x, install("Gp")))
-
-/** Return the double pointer to the Cx slot or (double*) NULL if
- * Cx has length 0) */
-#define Cx_SLOT(x) SLOT_REAL_NULL(x, "Cx")
-
-/** Return the double pointer to the deviance slot */
-#define DEV_SLOT(x) SLOT_REAL_NULL(x, "deviance")
-
-/** Return the double pointer to the sqrtrWt slot or (double*) NULL if
- *  sqrtrWt has length 0) */
-#define SRWT_SLOT(x) SLOT_REAL_NULL(x, "sqrtrWt")
-
-/** Return the double pointer to the sqrtXWt slot or (double*) NULL if
- *  sqrtXWt has length 0) */
-#define SXWT_SLOT(x) SLOT_REAL_NULL(x, "sqrtXWt")
-
-/** Return the double pointer to the p slot or (double*) NULL if
- *  sqrtXWt has length 0) */
-#define P_SLOT(x) SLOT_REAL_NULL(x, "p")
-
-/** Return the double pointer to the phi slot or (double*) NULL if
- *  sqrtXWt has length 0) */
-#define PHI_SLOT(x) SLOT_REAL_NULL(x, "phi")
-
-/** Return the double pointer to the link_power slot or (double*) NULL if
- *  sqrtXWt has length 0) */
-#define LKP_SLOT(x) SLOT_REAL_NULL(x, "link.power")
-
-/** Return the double pointer to the bound_p slot  */
-#define BDP_SLOT(x) SLOT_REAL_NULL(x,"bound.p")
-
-/** Return the integer pointer to the permutation vector in the L slot */
-#define PERM_VEC(x) INTEGER(GET_SLOT(GET_SLOT(x, install("L")), install("perm")))
-
-/** Return the double pointer to the ranef slot or (double*) NULL if
- *  ranef has length 0) */
-#define RANEF_SLOT(x) SLOT_REAL_NULL(x, "ranef")
-
-/** Return the double pointer to the ghw slot */
-#define GHW_SLOT(x) SLOT_REAL_NULL(x, "ghw")
-
-/** Return the double pointer to the ghx slot */
-#define GHX_SLOT(x) SLOT_REAL_NULL(x, "ghx")
-
-/**
  * Permute the vector src according to perm into dest
  *
  * @param dest destination
@@ -208,38 +96,6 @@ apply_perm(double *dest, const double *src, const int *perm, int n)
     for (int i = 0; i < n; i++) dest[i] = src[perm ? perm[i] : i];
     return dest;
 }
-
-/**
- * Return the sum of squares of the first n elements of x
- *
- * @param n
- * @param x
- *
- * @return sum of squares
- */
-static R_INLINE double sqr_length(const double *x, int n)
-{
-    double ans = 0;
-    for (int i = 0; i < n; i++) ans += x[i] * x[i];
-    return ans;
-}
-
-/**
- * Return the index of the term associated with parameter index ind
- *
- * @param ind an index in [0, Gp[nt] - 1]
- * @param nt total number of terms
- * @param Gp group pointers, a vector of length nt+1 with Gp[0] = 0
- *
- * @return sum of squares
- */
-static R_INLINE int Gp_grp(int ind, int nt, const int *Gp)
-{
-    for (int i = 0; i < nt; i++) if (ind < Gp[i + 1]) return i;
-    error(_("invalid row index %d (max is %d)"), ind, Gp[nt]);
-    return -1;                  /* -Wall */
-}
-
 
 /**
  * Extract the parameters from ST list
@@ -281,8 +137,8 @@ static double *ST_getPars(SEXP x, double *pars)
  *
  * @return maximum element of nc
  */
-static int			/* populate the st, nc and nlev arrays */
-ST_nc_nlev(const SEXP ST, const int *Gp, double **st, int *nc, int *nlev)
+/* populate the st, nc and nlev arrays */
+int  ST_nc_nlev(const SEXP ST, const int *Gp, double **st, int *nc, int *nlev)
 {
     int ans = 0, nt = LENGTH(ST);
 
@@ -293,7 +149,7 @@ ST_nc_nlev(const SEXP ST, const int *Gp, double **st, int *nc, int *nlev)
 	if (nci > ans) ans = nci;
 	if (st) st[i] = REAL(STi);
 	nc[i] = nci;
-	nlev[i] = (Gp[i + 1] - Gp[i])/nci;
+	nlev[i] = (Gp[i + 1] - Gp[i]) / nci;
     }
     return ans;
 }
@@ -379,7 +235,7 @@ static double cp_update_L(SEXP x)
     double  *cx = Cx_SLOT(x), *d = DEV_SLOT(x),
 	*res = RESID_SLOT(x), *mu = MU_SLOT(x), *muEta = MUETA_SLOT(x),
 	*pwt = PWT_SLOT(x), *sXwt = SXWT_SLOT(x), *srwt = SRWT_SLOT(x),
-	*var =  VAR_SLOT(x), *y = Y_SLOT(x), one[] = {1,0};
+	*var =  VAR_SLOT(x), *y = Y_SLOT(x), one[] = {1, 0};
     CHM_SP A = A_SLOT(x);
     CHM_FR L = L_SLOT(x);
     R_CheckStack();
@@ -431,25 +287,24 @@ static double cp_update_mu(SEXP x)
 {
     int *dims = DIMS_SLOT(x);
     int i1 = 1, n = dims[n_POS], p = dims[p_POS];
-    int  i ;
-    double  *d = DEV_SLOT(x), *eta = ETA_SLOT(x),
+    double *d = DEV_SLOT(x), *eta = ETA_SLOT(x),
         *mu = MU_SLOT(x),
 	*muEta = MUETA_SLOT(x), *offset = OFFSET_SLOT(x),
 	*srwt = SRWT_SLOT(x), *res = RESID_SLOT(x),
         *lkp = LKP_SLOT(x), *vp = P_SLOT(x),
         *var = VAR_SLOT(x), 
-        *y = Y_SLOT(x), one[] = {1,0};
+        *y = Y_SLOT(x), one[] = {1, 0};
     CHM_FR L = L_SLOT(x);
     CHM_SP A = A_SLOT(x);
     CHM_DN Ptu, ceta, cu = AS_CHM_DN(GET_SLOT(x, install("u")));
     R_CheckStack();
 
-    /* eta := offset or eta := 0 */
-    for ( i = 0; i < n; i++) eta[i] = offset ? offset[i] : 0;
-				/* eta := eta + X \beta */
+    /* eta := offset (offset initialized to zero if NULL) */
+    Memcpy(eta, offset, n);
+    /* eta := eta + X \beta */
     F77_CALL(dgemv)("N", &n, &p, one, X_SLOT(x), &n,
 		    FIXEF_SLOT(x), &i1, one, eta, &i1);
-				/* eta := eta + C' P' u */
+    /* eta := eta + C' P' u */
     Ptu = M_cholmod_solve(CHOLMOD_Pt, L, cu, &c);
     ceta = N_AS_CHM_DN(eta, n, 1);
     R_CheckStack();
@@ -457,16 +312,20 @@ static double cp_update_mu(SEXP x)
 	error(_("cholmod_sdmult error returned"));
     M_cholmod_free_dense(&Ptu, &c);
 
-    // update mu, muEta and var
-    cplm_mu_eta(mu, muEta, n, eta, *lkp);
-    cplm_varFun(var,mu, n,*vp);
-   
-    d[wrss_POS] = 0;		/* update resid slot and d[wrss_POS] */
-    for (i = 0; i < n; i++) {
+    /* update mu, muEta and var */
+    for (int i = 0; i < n; i++){
+        mu[i] = link_inv(eta[i], *lkp);
+        muEta[i] = mu_eta(eta[i], *lkp);
+        var[i] = pow(mu[i], *vp); 
+    }
+    
+    /* update resid slot and d[wrss_POS] */
+    d[wrss_POS] = 0;		
+    for (int i = 0; i < n; i++) {
 	res[i] = (y[i] - mu[i]) * (srwt ? srwt[i] : 1);
 	d[wrss_POS] += res[i] * res[i];
     }
-				/* store u'u */
+    /* store u'u */
     d[usqr_POS] = sqr_length((double*)(cu->x), dims[q_POS]);
     d[pwrss_POS] = d[usqr_POS] + d[wrss_POS];
     return d[pwrss_POS];
@@ -485,7 +344,7 @@ static double cp_update_mu(SEXP x)
 static int cp_update_u(SEXP x)
 {
     int *dims = DIMS_SLOT(x);
-    int i, n = dims[n_POS], q = dims[q_POS], verb = dims[verb_POS];
+    int i = 0, n = dims[n_POS], q = dims[q_POS], verb = dims[verb_POS];
     double *Cx = Cx_SLOT(x), 
 	*res = RESID_SLOT(x), *u = U_SLOT(x),
 	cfac = ((double)n) / ((double)q),
@@ -613,8 +472,7 @@ static void cp_setPars(SEXP x, double *pars){
 static double cp_update_dev(SEXP x, double *parm)
 {
     int *dims = DIMS_SLOT(x) ;
-    int n = dims[n_POS], 
-      q = dims[q_POS], nAGQ = dims[nAGQ_POS] ;
+    int n = dims[n_POS], q = dims[q_POS], nAGQ = dims[nAGQ_POS] ;
     SEXP flistP = GET_SLOT(x, install("flist"));
     double *d = DEV_SLOT(x), *y = Y_SLOT(x),
       *mu = MU_SLOT(x), *phi = PHI_SLOT(x),
@@ -622,86 +480,101 @@ static double cp_update_dev(SEXP x, double *parm)
       *u = U_SLOT(x);
     CHM_FR L = L_SLOT(x);
     
-    if (parm != NULL) cp_setPars(x, parm) ;
+    if (parm) cp_setPars(x, parm) ;
     // find conditional mode
     cp_update_u(x);
 
-    if (nAGQ < 1) error("nAGQ must be positive");
+    if (nAGQ < 1) error(_("nAGQ must be positive"));
     if ((nAGQ > 1) & (LENGTH(flistP) != 1))
-      error("AGQ method requires a single grouping factor");
+      error(_("AGQ method requires a single grouping factor"));
     d[ML_POS] = d[ldL2_POS];
-
     // Laplace Approximation 
     if (nAGQ == 1) {
-      double ans=0 ;
-      for (int i=0;i<n;i++)
-        ans += dtweedie(y[i],mu[i],phi[0]/pwt[i],p[0]) ; //log-likelihood
-      d[disc_POS] = - 2* ans;
+      d[disc_POS] = dl2tweedie(n, y, mu, phi[0], p[0], pwt);
       d[ML_POS] += d[disc_POS] + d[usqr_POS] / phi[0] ; 
       return d[ML_POS]; 
     } else {
       // Adaptive Gauss-Hermite quadrature 
       const int nl = nlevels(VECTOR_ELT(flistP, 0));
-      const int nre = q / nl; 	/* number of random effects per level */
-      int *fl0 = INTEGER(VECTOR_ELT(flistP, 0)), *pointer = Alloca(nre, int);
-      double *ghw = GHW_SLOT(x), *ghx = GHX_SLOT(x),
-	//
-	*uold = Memcpy(Calloc(q, double), u, q),
-	*tmp = Calloc(nl, double),
-	w_pro = 1, z_sum = 0;           /* values needed in AGQ evaluation */
-      const double sigma = sqrt(phi[0]);
+      const int nre = q / nl; 	             /* number of random effects per level */
+      int pos = 0, nt = 1, *fl0 = INTEGER(VECTOR_ELT(flistP, 0)), 
+	*pointer = Alloca(nre, int);
+      for (int i = 0; i < nre; i++) nt *= nAGQ;
+	
+      double *ghw = GHW_SLOT(x), *ghx = GHX_SLOT(x),          
+	*uold = Memcpy(Calloc(q, double), u, q), 
+	*z = Calloc(q, double),              /* current abscissas */
+	*ans_tmp = Calloc(n, double),        /* log data density */
+	*ans = Calloc(nl, double);           /* loglikelihood by group */
+      double mm, W = 0.0;                    /* values needed in AGQ evaluation */
+      double sigma = sqrt(phi[0]);
+      double **tmp = Calloc(nl, double*);    /* matrix of exponents as in log(exp(x1) + ...) */
+      for (int i = 0; i < nl; i++)  tmp[i] = Calloc(nt, double);
       R_CheckStack();
       AZERO(pointer, nre);
-      AZERO(tmp, nl);
 
-      while(pointer[nre - 1] < nAGQ){
-	double *z = Calloc(q, double);       /* current abscissas */
-	double *ans = Calloc(nl, double);    /* current penalized residuals in different levels */
+      while(pointer[nre - 1] < nAGQ){                 /* the Cartesian product */
 	/* update abscissas and weights */
 	for(int i = 0; i < nre; ++i){
 	  for(int j = 0; j < nl; ++j)
-	    z[i + j * nre] = ghx[pointer[i]];
-	  w_pro *= ghw[pointer[i]];
-	  z_sum += z[pointer[i]] * z[pointer[i]]; // constant used in AGQ
+	    z[j + i * nl] = ghx[pointer[i]];          /* zeros corresp to each u */ 
+	  W += log(ghw[pointer[i]]) + ghx[pointer[i]] * ghx[pointer[i]]; 
+	  /* accumulate zeros and weights (const used in AGQ)*/
 	}
-	// scaling: u = u_old + sigma * z / L_ii
+	
+	/* scale the zeros: u = u_old + sigma * L^{-1} * z */
 	CHM_DN cz = N_AS_CHM_DN(z, q, 1), sol;
 	if(!(sol = M_cholmod_solve(CHOLMOD_L, L, cz, &c)))
 	  error(_("cholmod_solve(CHOLMOD_L) failed"));
 	Memcpy(z, (double *)sol->x, q);
-	M_cholmod_free_dense(&sol, &c);   // z / L_ii
+	M_cholmod_free_dense(&sol, &c);   
 	for(int i = 0; i < q; ++i) 
-	  u[i] = uold[i] + sqrt(2) * sigma * z[i];   
-	cp_update_mu(x);
-	// get data likelihood
+	  u[i] = uold[i] + M_SQRT2 * sigma * z[i];   
+	/* get data likelihood */
+	cp_update_mu(x);      
+        dtweedie(n, y, mu, phi[0], p[0], pwt, ans_tmp);
 	AZERO(ans, nl);
-	for (int i = 0; i < n; i++) {
-	  ans[fl0[i] - 1] +=  dtweedie(y[i], mu[i], phi[0] / pwt[i], p[0]) ; 
-	}
-	// contribution from u
+	for (int i = 0; i < n; i++) 
+	  ans[fl0[i] - 1] +=  ans_tmp[i] ;        
+
+	/* add the contribution from u */
 	for(int i = 0; i < nre; ++i)
 	  for(int j = 0; j < nl; ++j)
-	    ans[j] -= 0.5 * u[i + j * nre] * u[i + j * nre] / phi[0];
-	// adaptive GHQ estimate 
+	    ans[j] -= 0.5 * u[j + i * nl] * u[j + i * nl] / phi[0];
+	
+	/* the exponent in the AGQ objective */
 	for(int i = 0; i < nl; ++i)
-	  tmp[i] += exp(ans[i] + z_sum ) * w_pro / sqrt(PI);
-	// move pointer to next combination of weights and abbsicas 
+	  tmp[i][pos] = ans[i] + W;
+	pos++ ;
+
+	/* move pointer to next combination of weights and zeros */
 	int count = 0;
 	pointer[count]++;
 	while(pointer[count] == nAGQ && count < nre - 1){
 	  pointer[count] = 0;
 	  pointer[++count]++;
 	}
-	w_pro = 1;
-	z_sum = 0;
-	if(z)    Free(z);
-	if(ans)  Free(ans);
+	W = 0;
       }
-      for(int j = 0; j < nl; ++j) d[ML_POS] -= 2 * log(tmp[j]);
+
+      /* compute log(exp(x1) + exp(x2) + ...) */
+      AZERO(ans, nl);
+      for (int i = 0; i < nl; i++){
+	mm = dmax(tmp[i], nt);                    /* max of the exponents */
+	for (int k = 0; k < nt; k++)
+	  ans[i] += exp(tmp[i][k] - mm);          /* subtract max before exponentiation */
+	d[ML_POS] -= 2 * (log(ans[i]) + mm);      /* -2 loglik */
+      }
+
+      /* restore values */
       Memcpy(u, uold, q);
       cp_update_mu(x);
-      if(tmp)   Free(tmp);
-      if(uold)  Free(uold);
+      Free(uold);
+      Free(z);
+      Free(ans_tmp); 
+      Free(ans);
+      for (int i = 0; i < nl; i++) Free(tmp[i]);
+      Free(tmp);
       return d[ML_POS] ;
     }
 }
@@ -749,17 +622,17 @@ SEXP cpglmm_optimize(SEXP x)
     iv[MXITER] = dims[mxit_POS];
 				/* set the bounds to plus/minus Infty  */
     for (int i = 0; i < nv; i++) {
-	b[2*i] = R_NegInf; b[2*i+1] = R_PosInf; d[i] = 1;
+	b[2 * i] = R_NegInf; b[2 * i + 1] = R_PosInf; d[i] = 1;
     }
 				/* reset lower bounds on elements of theta_S */
     for (int i = 0, pos = 0; i < nt; i++) {
 	int nc = *INTEGER(getAttrib(VECTOR_ELT(ST, i), R_DimSymbol));
-	for (int j = 0; j < nc; j++) b[pos + 2*j] = 0;
+	for (int j = 0; j < nc; j++) b[pos + 2 * j] = 0;
 	pos += nc * (nc + 1);
     }
     /* reset bound for p */
-    b[(nv1+1)*2]= BDP_SLOT(x)[0] ;
-    b[nv*2-1] = BDP_SLOT(x)[1] ;
+    b[(nv1 + 1) * 2] = BDP_SLOT(x)[0] ;
+    b[nv * 2 - 1] = BDP_SLOT(x)[1] ;
 
     /* run optimization */
     do {

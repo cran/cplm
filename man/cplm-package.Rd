@@ -5,16 +5,18 @@
 \title{
   Tweedie compound Poisson linear models 
 }
-\description{This R package provides various methods for fitting Tweedie compound Poisson linear models. The Tweedie compound Poisson distribution is a subclass of the exponential dispersion family with a power variance function, where the value of the power index lies in the interval (1,2). The distribution is composed of a probability mass at the origin accompanied by a skewed continuous distribution on the positive values, and has been widely used in applied statistical fields for modeling continuous data with exact zeros. However, it is well known that the density function is not analytically tractable, and in order to carry out maximum likelihood approximations, we can either rely on numerical approximations of the density (available in the \code{tweedie} package), or introduce latent variables and work on the complete data to avoid direct density approximations.  Both methods are available in the package.  
+\description{The Tweedie compound Poisson distribution is a mixture of a degenerate distribution at the origin and a continuous distribution on the positive real line. It has been applied in a wide range of fields in which continuous data with exact zeros regularly arise. Nevertheless, statistical inference based on full likelihood and Bayesian methods is not available in most statistical software, largely because the distribution has an intractable density function and numerical methods that allow fast and accurate evaluation of the density did not appear until fairly recently. The \code{cplm} package provides likelihood-based and Bayesian procedures for fitting common Tweedie compound Poisson linear models. In particular, models with hierarchical structures or extra zero inflation can be handled. Further, the package implements the Gini index based on an ordered version of the Lorenz curve as a robust model comparison tool involving zero-inflated and highly skewed distributions.  
 
 The following features of the package may be of special interest to the users:
 
 \enumerate{
-\item{All methods available in the package enable the index parameter to be estimated from the data.}
-\item{The compound Poisson generalized linear model handles large data set using the bounded memory regression facility in \code{biglm}.}
-\item{For mixed-effect models, we provide Laplace and adaptive Gauss-Hermit quadrature methods. These likelihood approximation methods generally have better asymptotic properties than the Penalized Quasi-likelihood approach.}
-\item{An convenient interface is offered to fit compound Poisson additive models using the mixed-effect model structure.}
-\item{Self-tuned Markov Chain Monte Carlo procedures are available for both the compound Poisson generalized linear model and the mixed-effect model.}
+\item All methods available in the package enable the index parameter (i.e., the unknown variance function) to be estimated from the data.
+\item The compound Poisson generalized linear model handles large data set using the bounded memory regression facility in \code{biglm}.
+\item For mixed models, we provide likelihood-based methods using Laplace approximation and adaptive Gauss-Hermit quadrature. 
+\item A convenient interface is offered to fit additive models (penalized splines) using the mixed model estimation procedure.
+\item Self-tuned Markov chain Monte Carlo procedures are available for both GLM-type and  mixed models.
+\item The package also implements a zero-inflated compound Poisson model, in which the observed frequency of zeros can generally be more adequately modeled. 
+\item We provide the Gini index based on an ordered Lorenz curve, which is better suited for model comparison involving the compound Poisson distribution.
 }
 
 More information is available on the hosting web site of the project \url{http://code.google.com/p/cplm/}
@@ -24,8 +26,14 @@ More information is available on the hosting web site of the project \url{http:/
 Wayne Zhang <actuary_zhang@hotmail.com>
 }
 \references{
-\cite{ Dunn, P.K. and Smyth, G.K. (2005). Series evaluation of Tweedie exponential dispersion models densities. \emph{Statistics and Computing}, 15, 267-280.}
+\cite{Dunn, P.K. and Smyth, G.K. (2005). Series evaluation of Tweedie exponential dispersion models densities. \emph{Statistics and Computing}, 15, 267-280.}
 
+\cite{Frees, E. W., Meyers, G. and Cummings, D. A. (2011). Summarizing Insurance Scores Using
+a Gini Index. \emph{Journal of the American Statistical Association}, 495, 1085 - 1098.
+}
+
+\cite{ Zhang, Y. Likelihood-based and Bayesian Methods for Tweedie Compound Poisson Linear Mixed Models, \emph{Statistics and Computing}, forthcoming. 
+\url{http://www.actuaryzhang.com/publication/MixedTweedie.pdf}}
 }
 
 

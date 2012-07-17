@@ -1,4 +1,4 @@
-useDynLib(cplm, .registration=TRUE)
+useDynLib(cplm, .registration = TRUE)
 
 ############################
 #  import 
@@ -6,9 +6,12 @@ useDynLib(cplm, .registration=TRUE)
 import(Matrix)
 import(coda)
 importFrom(minqa, bobyqa)
+importFrom(reshape2, melt)
+importFrom(statmod, tweedie)
+importFrom(tweedie, dtweedie.series, dtweedie, tweedie.dev)
 importMethodsFrom(methods, show)
 importClassesFrom(lme4, mer, summary.mer)
-importMethodsFrom(lme4, VarCorr, vcov, mcmcsamp, residuals, resid,
+importMethodsFrom(lme4, fixef, VarCorr, vcov, mcmcsamp, residuals, resid,
 			fitted, terms, formula, deviance, model.matrix, 
 			coef, plot)
 importMethodsFrom(stats4, AIC)
@@ -18,15 +21,16 @@ importMethodsFrom(amer, predict)
 #  export 
 ############################
 # functions 
-export(cpglm, cpglmm, bcpglm, bcpglmm)
-export(igamma, iwish, sp2d)
+export(cpglm, cpglmm, bcplm, zcpglm, gini)
+export(sp2d)
+export(getF, plotF)
 
 #Classes
-exportClasses(cplm, cpglm, cpglmm, bcpglm, bcpglmm, summary.cpglmm)
-exportClasses(NullNum, NullList)
+exportClasses(cplm, cpglm, cpglmm, bcplm, summary.cpglmm, zcpglm, gini)
+exportClasses(NullNum, NullList, NullFunc, ListFrame)
            
 #Methods
 exportMethods(summary, show,  "$", "[[", "[", names, coef, vcov, 
               residuals, resid, fitted, 
 		  AIC, deviance, terms, formula, model.matrix, plot,
-		  VarCorr,  mcmcsamp, predict)
+		  VarCorr, predict)

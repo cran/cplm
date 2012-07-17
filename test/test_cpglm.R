@@ -1,5 +1,3 @@
-
-
 ###
 if (FALSE) {
 library(tweedie)
@@ -8,25 +6,26 @@ library(rbenchmark)
 
 options(error = recover)
 #setwd("~/2011/cplm")
-setwd("C:\\Documents and Settings\\CAB2007\\My Documents\\2011\\cplm")
+setwd("C:\\Documents and Settings\\CAB2007\\My Documents\\2012\\cplm")
 load("./data/fineroot.RData")
-load("./data/insLoss.RData")
+load("./data/InsReserve.RData")
 
 source("./R/classMethods.R")
-#dyn.load("./src/cplm.so")
+source("./R/utilities.R")
+
 link="log"
 control=list()
 trace=T
-pstart=phistart=betastart=NULL
+contrasts = NULL
+
 
 
 cpglm <- function(formula, link = "log", data, weights, offset, 
-                  subset, na.action, betastart=NULL, phistart=NULL, 
-                  pstart=NULL, contrasts = NULL, control=list(),
-                  method ="proflie", ...) {}
-mf <- match.call(cpglm,call("cpglm",RLD~ factor(Zone)*factor(Stock),
-  data=fineroot,control=list(maxit=150,sample.iter=20),
-      pstart=1.4))
+                  subset, na.action = NULL, contrasts = NULL, 
+                  control = list(), chunksize = 0, ...) {}
+fm <- RLD ~ factor(Zone)
+call <- match.call(cpglm,call("cpglm",quote(fm), 
+  data=fineroot, chunksize = 250))
                     
 dyn.load("src/cpglm_em.dll")
 

@@ -1,4 +1,41 @@
 ================
+Version 0.6-1
+================
+NEW FEATURES
+
+   o Add vignettes 
+   o Add function 'zcpglm' which implements a zero-inflated compound Poisson 
+	generalized linear model 
+   o Add function 'gini' which computes the Gini indices that enable robust 
+	model comparison involving compound Poisson distributions
+
+CHANGES:
+
+   o Add a new data set 'AutoClaim'
+   o Set the max number of terms in computing the compound Poisson density using 
+	series evaluation method. 
+   o Correct bugs in predicting 'cpglm'. When the new data set has fewer factor 
+	levels, the old method produces wrong predictions.
+   o 'cpglm' has an argument 'optimizer' that allows users to select optimization routines.
+   o Function 'bcplm' now implements MCMC methods for both GLM and mixed models. 
+	This is a combination of the old functions 'bcpglm' and 'bcpglmm'
+   o Produce model summary for Bayesian estimates (from 'bcplm')
+   o Provide methods 'fixef' and 'VarCorr' for class 'bcplm'
+   o The tuning procedure in MCMC is now based a method described in  Browne and Draper (2005)
+   o MCMC now only implements univariate M-H within Gibbs sampling. Block update for the fixed 
+	effects are removed. 
+   o Remove the latent variable approach for Bayesian estimation
+   o Remove method 'mcmcsamp'
+   o Functions 'getF' and 'plotF' (copied from 'amer') now works for additive models
+	to extract and plot fitted smoothing effects
+   o Fix bugs in quadrature estimation of mixed models due to code inherited from lme4. This 
+	will only affect models with multiple random effects per level. 
+   o Fix the underflow issue in the quadrature estimation.
+   o Implement the PQL method to generate initial values in 'cpglmm'.
+
+
+
+================
 Version 0.5-1
 ================
 NEW FEATURES

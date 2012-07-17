@@ -5,9 +5,11 @@
  * @author Wayne Zhang                          
 */
 
-#include "cplm.h"
+#include "common.h"
+#include "cpglmm.h"
+#include "bcplm.h"
+#include "mh.h"
 #include <R_ext/Rdynload.h>
-#include "Matrix.h"
 
 #define CALLDEF(name, n)  {#name, (DL_FUNC) &name, n}
 
@@ -20,9 +22,13 @@ static R_CallMethodDef CallEntries[] = {
     CALLDEF(cpglmm_update_L, 1),
     CALLDEF(cpglmm_update_dev, 2),
     CALLDEF(cpglmm_setPars, 2),    
-    CALLDEF(bcpglmm_gibbs_tw, 1),
-    CALLDEF(bcpglm_gibbs_tw, 1),
-    CALLDEF(bcpglm_gibbs_lat, 1),
+    CALLDEF(bcplm_mcmc, 1),
+    CALLDEF(bcplm_update_mu, 1),   
+    CALLDEF(bcplm_post_p, 2),   
+    CALLDEF(bcplm_post_phi, 2),
+    CALLDEF(bcplm_post_betak, 2),
+    CALLDEF(bcplm_post_uk, 2),
+    CALLDEF(bcplm_metrop_rw, 7),
     {NULL, NULL, 0}
 };
 
