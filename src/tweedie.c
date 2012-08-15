@@ -160,6 +160,7 @@ double dl2tweedie(int n, double *y, double *mu, double phi, double p,
  * @param mu vector of means
  * @param phi scale parameter
  * @param p index parameter
+ * @param wts prior weights
  *
  * @return vector of loglikelihood 
  */

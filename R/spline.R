@@ -16,13 +16,13 @@ frFL <- function (formula, data, family, control = list(),
         parent.frame(2)))
     f.ind <- unlist(attr(tf, "specials"))
     n.f <- length(f.ind)
-    rhs <- amer:::safeDeparse(formula[[3]])
+    rhs <- safeDeparse(formula[[3]])
     fctterm <- fct <- vector(mode = "list", length = n.f)
     for (i in 1:n.f) 
       fctterm[[i]] <- attr(tf, "variables")[[f.ind[i] + 1]]
     fct <- lapply(fctterm, eval, envir = data, enclos = parent.frame(2))
     for (i in seq_along(fct)) 
-      fct[[i]] <- amer:::expandBasis(fct[[i]], eval(attr(fct[[i]], "call")$by, data), 
+      fct[[i]] <- expandBasis(fct[[i]], eval(attr(fct[[i]], "call")$by, data), 
                   eval(attr(fct[[i]], "call")$varying, data), bySetToZero)
     names(fct) <- names(fctterm) <- paste("f.", lapply(fct, 
             function(x) {
@@ -32,8 +32,8 @@ frFL <- function (formula, data, family, control = list(),
                   "call")$allPen), paste(".", deparse(attr(x, 
                   "call")$by), sep = ""), ""), sep = "")
             }), sep = "")
-    rhs <- amer:::subFcts(rhs, fctterm, fct, data)
-    data <- amer:::expandMf(data, fct)
+    rhs <- subFcts(rhs, fctterm, fct, data)
+    data <- expandMf(data, fct)
     call[[1]] <- as.name("lmer")
     call$doFit <- FALSE
     call$data <- as.name("data")
@@ -41,7 +41,7 @@ frFL <- function (formula, data, family, control = list(),
     call["basisGenerators"] <- NULL
     m <- eval(call, data)
     #    m$fr$mf <- data
-    m <- amer:::subAZ(m, fct)
+    m <- subAZ(m, fct)
     fctterm <- lapply(fct, function(x) attr(x, "call"))
     return(list(m = m, fct = fct, fctterm = fctterm))
 }
@@ -67,7 +67,7 @@ sp2d <- function(x1, x2, k = max(20,min(length(x1)/4,150)),
                  by = NULL, allPen = FALSE, varying = NULL, 
                  diag = FALSE, knots1 = quantile(x1, probs = 1:k/(k+1)),
                  knots2 = quantile(x1, probs = 1:k/(k+1))) {
-  call <- as.list(amer:::expand.call())
+  call <- as.list(expand.call())
   knots1 <- eval(knots1)
   knots2 <- eval(knots2)
   k <- eval(k)
@@ -112,7 +112,7 @@ getF <- function (object, which, n=100, newdata=NULL, interval = c("NONE", "MCMC
   if(is.character(which)) {
     which <- match(which, names(terms))
     if(any(nas <- is.na(which))) 
-      warning("entry ", paste(which[nas], collapse=", "), " in 'which' did not match any function names in ", amer:::safeDeparse(object) ,".")
+      warning("entry ", paste(which[nas], collapse=", "), " in 'which' did not match any function names in ", safeDeparse(object) ,".")
     which <- which[!nas]
   }
   if(length(addConst) != length(which)) addConst <- rep(addConst, length=length(which))
@@ -189,7 +189,7 @@ getF <- function (object, which, n=100, newdata=NULL, interval = c("NONE", "MCMC
     # set up / check newdata
     ################################
     if(!is.null(terms[[i]]$by)){
-      lvls <- levels(object@frame[, amer:::safeDeparse(terms[[i]]$by)])#FIXME: in amerSetup: this will fail if terms[[i]]$x was only in the workspace but not in the supplied data.frame for the original call.
+      lvls <- levels(object@frame[, safeDeparse(terms[[i]]$by)])#FIXME: in amerSetup: this will fail if terms[[i]]$x was only in the workspace but not in the supplied data.frame for the original call.
       hasBy <- TRUE
     } else hasBy <-FALSE	
     hasVarying <- !is.null(terms[[i]]$varying)
@@ -198,28 +198,28 @@ getF <- function (object, which, n=100, newdata=NULL, interval = c("NONE", "MCMC
       grid <- TRUE
       #FIXME: adapt this for 2d/3d-smooths
       #get range of covariates + sequence of values
-      lim <- range(object@frame[, amer:::safeDeparse(terms[[i]]$x)], na.rm=T) #FIXME: in amerSetup: this will fail if terms[[i]]$x was only in the workspace but not in the supplied data.frame for the original call.
+      lim <- range(object@frame[, safeDeparse(terms[[i]]$x)], na.rm=T) #FIXME: in amerSetup: this will fail if terms[[i]]$x was only in the workspace but not in the supplied data.frame for the original call.
       newX <- seq(lim[1], lim[2], l=n)
       if(hasBy){
         newBy <- factor(rep(lvls, length=n), labels=lvls)
         data <- data.frame(newX, newBy)
-        colnames(data) <- c(amer:::safeDeparse(terms[[i]]$x), amer:::safeDeparse(terms[[i]]$by))
+        colnames(data) <- c(safeDeparse(terms[[i]]$x), safeDeparse(terms[[i]]$by))
       } else {
         data <- data.frame(newX)
-        colnames(data) <- amer:::safeDeparse(terms[[i]]$x)
+        colnames(data) <- safeDeparse(terms[[i]]$x)
       }
       if(hasVarying){
         #varying covariate is set value of varying
         data <- cbind(data, rep(varying, nrow(data)))
-        colnames(data)[NCOL(data)] <- amer:::safeDeparse(terms[[i]]$varying)
+        colnames(data)[NCOL(data)] <- safeDeparse(terms[[i]]$varying)
       }
     } else {
       grid <- FALSE
       data <- newdata
       n <- nrow(newdata)
-      vnames <- amer:::safeDeparse(terms[[i]]$x)
-      if(hasBy) vnames <- c(vnames,amer:::safeDeparse(terms[[i]]$by))
-      if(hasVarying) vnames <- c(vnames, amer:::safeDeparse(terms[[i]]$varying))
+      vnames <- safeDeparse(terms[[i]]$x)
+      if(hasBy) vnames <- c(vnames,safeDeparse(terms[[i]]$by))
+      if(hasVarying) vnames <- c(vnames, safeDeparse(terms[[i]]$varying))
       if(any(nas <- is.na(match(vnames, colnames(data))))) 
         stop("variable ", paste(vnames[nas], collapse=", "), "not found in given data.")
       data <- data[, colnames(data) %in% vnames, drop=F]
@@ -229,7 +229,7 @@ getF <- function (object, which, n=100, newdata=NULL, interval = c("NONE", "MCMC
     #create basis:
     #################################
     base <- eval(terms[[i]], data)
-    base <- amer:::expandBasis(base, 
+    base <- expandBasis(base, 
                         by = eval(attr(base, "call")$by, data),  
                         varying = eval(attr(base, "call")$varying, data),
                         bySetToZero = !grid)
@@ -244,7 +244,7 @@ getF <- function (object, which, n=100, newdata=NULL, interval = c("NONE", "MCMC
       #how many penalized spline functions per level of by
       dimOneZ <- length(indZ)/length(lvls)
       useZ <- 1:dimOneZ
-      if(grid) fullZ <- amer:::expandBasis(eval(terms[[i]], data), 
+      if(grid) fullZ <- expandBasis(eval(terms[[i]], data), 
                                     by = NULL,  
                                     varying = eval(attr(base, "call")$varying, data),
                                     bySetToZero = FALSE)$Z
@@ -252,7 +252,7 @@ getF <- function (object, which, n=100, newdata=NULL, interval = c("NONE", "MCMC
     
     nf <- ifelse(hasBy, length(lvls), 1)
     ans[[indWhich]] <- vector(mode="list", length = nf)
-    names(ans[[indWhich]]) <-  if(hasBy) paste(amer:::safeDeparse(terms[[i]]$by), lvls, sep="") else names(base$X)
+    names(ans[[indWhich]]) <-  if(hasBy) paste(safeDeparse(terms[[i]]$by), lvls, sep="") else names(base$X)
     for(j in seq_along(ans[[indWhich]])){
       #################################
       #calculate fits and cis
@@ -302,7 +302,7 @@ getF <- function (object, which, n=100, newdata=NULL, interval = c("NONE", "MCMC
       
       if(addConst[i]){
         #add columns for constant terms to X, append indUnpen:	
-        byColumn <-if(hasBy && paste(amer:::safeDeparse(terms[[i]]$by),lvls[j],sep="") %in% names(object@fixef)){
+        byColumn <-if(hasBy && paste(safeDeparse(terms[[i]]$by),lvls[j],sep="") %in% names(object@fixef)){
           rep(1, nrow(base$X[[ansInd]]))
         } else numeric(0) 
         base$X[[ansInd]] <- cBind(byColumn, base$X[[ansInd]])	
@@ -328,7 +328,7 @@ getF <- function (object, which, n=100, newdata=NULL, interval = c("NONE", "MCMC
         ci <- matrix(NA, nrow=nrow(base$X[[ansInd]]), ncol=0)
       }
       dataJ <- if(grid){
-        data[,!(colnames(data)==amer:::safeDeparse(terms[[i]]$by)), drop=F]
+        data[,!(colnames(data)==safeDeparse(terms[[i]]$by)), drop=F]
       } else {
         ## if(!grid && hasBy){
         ##     data[use,] 
@@ -354,7 +354,7 @@ plotF <- function(object, which, n=100, interval = "RW", addConst = TRUE, trans=
   if(is.character(which)) {
     which <- match(which, names(terms))
     if(any(nas <- is.na(which))) 
-      warning("entry ", paste(which[nas], collapse=", "), " in 'which' did not match any function names in ", amer:::safeDeparse(object) ,".")
+      warning("entry ", paste(which[nas], collapse=", "), " in 'which' did not match any function names in ", safeDeparse(object) ,".")
     which <- which[!nas]
   }
   if(length(legendPos) != length(which)) legendPos <- rep(legendPos, length=length(which))
@@ -369,7 +369,7 @@ plotF <- function(object, which, n=100, interval = "RW", addConst = TRUE, trans=
     oldpar <- NULL
     on.exit(par(oldpar))
     nf <- length(res)
-    oldpar <- par(mfrow = amer:::set.mfrow(Nparms=nf))
+    oldpar <- par(mfrow = set.mfrow(Nparms=nf))
   }
   
   
@@ -404,7 +404,7 @@ plotF <- function(object, which, n=100, interval = "RW", addConst = TRUE, trans=
     plot1F(res[[i]], interval = !(interval=="NONE")&&!allPen[i], legendPos = legendPos[i], ...)
     if(is.null(dots$ylab)){
       ylab <- ifelse(addConst[i], paste(names(res)[i], "+ const"), names(res)[i])
-      if(any(trans(-2:2)!= (-2:2))) ylab <- paste(amer:::safeDeparse(match.call()$trans),"(",ylab,")",sep="")
+      if(any(trans(-2:2)!= (-2:2))) ylab <- paste(safeDeparse(match.call()$trans),"(",ylab,")",sep="")
     } else{
       ylab <-dots$ylab
       dots <- dots[names(dots)!="ylab"]
@@ -415,9 +415,9 @@ plotF <- function(object, which, n=100, interval = "RW", addConst = TRUE, trans=
         rug(object@frame[,colnames(res[[i]][[1]])[1]], ...)
       } else {
         nlvls <- length(res[[i]]) 
-        lvls <- levels(object@frame[, amer:::safeDeparse(object@smooths[[i]]$by)])
+        lvls <- levels(object@frame[, safeDeparse(object@smooths[[i]]$by)])
         for(j in 1:nlvls){
-          use <- object@frame[,amer:::safeDeparse(object@smooths[[i]]$by)] == lvls[j]
+          use <- object@frame[,safeDeparse(object@smooths[[i]]$by)] == lvls[j]
           rug(object@frame[use, colnames(res[[i]][[1]])[1]], col =j, ...)
         }	
       }	

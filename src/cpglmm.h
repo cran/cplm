@@ -1,3 +1,9 @@
+/**
+ * @file cpglmm.h
+ * @brief header files for mixed models
+ * @author Wayne Zhang                         
+*/
+
 #ifndef CPGLMM_H
 #define CPGLMM_H
 

@@ -15,7 +15,7 @@ importMethodsFrom(lme4, fixef, VarCorr, vcov, mcmcsamp, residuals, resid,
 			fitted, terms, formula, deviance, model.matrix, 
 			coef, plot)
 importMethodsFrom(stats4, AIC)
-importMethodsFrom(amer, predict)
+importMethodsFrom(stats, predict)
 
 ############################
 #  export 
@@ -23,7 +23,7 @@ importMethodsFrom(amer, predict)
 # functions 
 export(cpglm, cpglmm, bcplm, zcpglm, gini)
 export(sp2d)
-export(getF, plotF)
+export(getF, plotF, tp, bsp)   #amer functions
 
 #Classes
 exportClasses(cplm, cpglm, cpglmm, bcplm, summary.cpglmm, zcpglm, gini)

@@ -1,8 +1,9 @@
-/********************************************************************
+/**
  * @file mh.c
  * @brief Functions for the random work Metropolis-Hastings algorithm
  * @author Wayne Zhang                        
- ********************************************************************/
+ *
+ */
 
 #include <R.h>            /* for R related */
 #include <Rmath.h>        /* for random number simulators */ 
@@ -157,9 +158,15 @@ int metrop_mvnorm_rw(int d, double *m, double *v, double *sn,
 /*                      R Callable functions                        */
 /********************************************************************/
 
+
+/**
+ * struct used in the general M-H algorithm admitting R functions.
+ * This struct is passed to the metrop_tnorm_rw function.
+ *
+ */
 typedef struct MH_STRUCT{
-  SEXP R_fcall;    /* function */
-  SEXP R_env;      /* where to evaluate the calls */
+  SEXP R_fcall;    /**<a user-defined R function */
+  SEXP R_env;      /**<where to evaluate the function calls */
 } mh_str;
 
 /**

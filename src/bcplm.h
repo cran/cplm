@@ -1,3 +1,9 @@
+/**
+ * @file bcplm.h
+ * @brief header files for Bayesian models
+ * @author Wayne Zhang                         
+*/
+
 #ifndef BCPLM_H
 #define BCPLM_H
 

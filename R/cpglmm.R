@@ -6,10 +6,10 @@
 cpglmm <- function(formula, link = "log", data, weights, offset,
                   subset, na.action, inits = NULL, 
                   contrasts = NULL, control = list(),
-                  basisGenerators = c("tp", "tpU", "bsp", "sp2d"),
+                  basisGenerators = c("tp", "bsp", "sp2d"),
                   optimizer = "nlminb", doFit = TRUE, nAGQ = 1) {
     
-  call <- amer:::expand.call()  
+  call <- expand.call()  
   if (missing(data)) 
     data <- environment(formula)   
   link.power <- make.link.power(link)
@@ -164,7 +164,7 @@ cpglmm <- function(formula, link = "log", data, weights, offset,
   ans@vcov <- vcov(ans)
   # add smooth terms 
   if (n.f) {
-    ans@smooths <- amer:::indsF(ans, setup$fct, setup$fctterm)
+    ans@smooths <- indsF(ans, setup$fct, setup$fctterm)
     vars <- unname(sapply(ans@smooths, function(tt) as.character(tt[["x"]])))
     ans@frame <- data.frame(ans@frame, base::subset(data, select = vars)) 
   }

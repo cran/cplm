@@ -11,6 +11,7 @@
 #include "mh.h"
 #include <R_ext/Rdynload.h>
 
+/** utitlity macro in registering native routines */
 #define CALLDEF(name, n)  {#name, (DL_FUNC) &name, n}
 
 /** function that registers native routines  */

@@ -9,7 +9,7 @@ Laplace approximation and adaptive Gauss-Hermite quadrature methods for compound
 \usage{
 cpglmm(formula, link = "log", data, weights, offset, subset, 
     na.action, inits = NULL,  contrasts = NULL, 
-    control = list(), basisGenerators = c("tp", "tpU", "bsp", "sp2d"),
+    control = list(), basisGenerators = c("tp", "bsp", "sp2d"),
     optimizer = "nlminb", doFit = TRUE, nAGQ = 1)
 }
 %- maybe also 'usage' for other objects documented here.
@@ -29,7 +29,7 @@ cpglmm(formula, link = "log", data, weights, offset, subset,
 a list of parameters for controlling the fitting process. See \code{\link{cpglm}}. For \code{cpglmm}, an additional parameter \code{PQL.init} indicates whether the PQL method (see \code{\link[MASS]{glmmPQL}}) will be used to generate initial values. The default is \code{TRUE}.
 }
   \item{basisGenerators}{
-a character vector of names of functions that generate spline bases. This is used when smoothing effects are to be included in the model. See \code{\link[amer]{amer}} and \code{\link[amer]{tp}} for details. 
+a character vector of names of functions that generate spline bases. This is used when smoothing effects are to be included in the model. See \code{\link{tp}} for details. 
 }
   \item{optimizer}{
 a character string that determines which optimization routine is to be used. Possible choices are \code{"nlminb"} (the default, see \code{\link[stats]{nlminb}}), \code{"bobyqa"} (\code{\link[minqa]{bobyqa}}) and \code{"L-BFGS-B"} (\code{\link[stats]{optim}}).   
@@ -47,7 +47,7 @@ Estimation of compound Poisson mixed models in  existing software has been limit
  
 This implementation is based on the code for  \code{\link[lme4]{glmer}} in the \code{lme4} package, with changes made on updating of the mean, the variance function and the marginal loglikelihood. For the Laplace method, one big difference to \code{glmer} is that the contribution of the dispersion parameter to the approximated loglikelihood is explicitly accounted for, which should be more accurate and more consistent with the quadrature estimate. Indeed, both the dispersion parameter and  the index parameter are included as a part of the optimization process. In computing the marginal loglikelihood, the density of the compound Poisson distribution is approximated using numerical methods provided in the \code{tweedie} package. For details of the Laplace approximation and the Gauss-Hermite quadrature method for generalized linear mixed models, see the documentation associated with \code{lme4}. 
 
-In addition, similar to the package \code{amer}, we provide convenient interfaces for fitting additive models using penalized splines. All the spline constructors available in \code{amer} or those defined by the users following the \code{amer} requirement can be directly used here. See the 'example' section for one such application.  
+In addition, similar to the package \code{amer} (already retired from CRAN), we provide convenient interfaces for fitting additive models using penalized splines.  See the 'example' section for one such application.  
 
 
 

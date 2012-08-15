@@ -1,3 +1,9 @@
+/**
+ * @file tweedie.h
+ * @brief header files for compound Poisson density evaluation
+ * @author Wayne Zhang                         
+*/
+
 #ifndef CPLM_TWEEDIE_H 
 #define CPLM_TWEEDIE_H 
 

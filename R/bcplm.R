@@ -10,9 +10,9 @@ bcplm <- function(formula, link = "log", data, inits = NULL,
                    n.sims = 1000, n.report = 2, prior.beta.mean = NULL, 
                    prior.beta.var = NULL, bound.phi = 100, bound.p = c(1.01, 1.99), 
                    tune.iter = 5000, n.tune = floor(tune.iter/100),
-                   basisGenerators = c("tp", "tpU", "bsp", "sp2d"), ...) {
+                   basisGenerators = c("tp", "bsp", "sp2d"), ...) {
 
-  call <- amer:::expand.call()  
+  call <- expand.call()  
   if (missing(data)) 
     data <- environment(formula)   
   link.power <- make.link.power(link)
