@@ -9,13 +9,14 @@ importFrom(minqa, bobyqa)
 importFrom(reshape2, melt)
 importFrom(statmod, tweedie)
 importFrom(tweedie, dtweedie.series, dtweedie, tweedie.dev)
+importFrom(stats, predict)
 importMethodsFrom(methods, show)
 importClassesFrom(lme4, mer, summary.mer)
 importMethodsFrom(lme4, fixef, VarCorr, vcov, mcmcsamp, residuals, resid,
 			fitted, terms, formula, deviance, model.matrix, 
 			coef, plot)
 importMethodsFrom(stats4, AIC)
-importMethodsFrom(stats, predict)
+
 
 ############################
 #  export 

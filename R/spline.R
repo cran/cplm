@@ -67,7 +67,7 @@ sp2d <- function(x1, x2, k = max(20,min(length(x1)/4,150)),
                  by = NULL, allPen = FALSE, varying = NULL, 
                  diag = FALSE, knots1 = quantile(x1, probs = 1:k/(k+1)),
                  knots2 = quantile(x1, probs = 1:k/(k+1))) {
-  call <- as.list(expand.call())
+  call <- as.list(expand.call(match.call()))
   knots1 <- eval(knots1)
   knots2 <- eval(knots2)
   k <- eval(k)

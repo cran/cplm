@@ -2,24 +2,24 @@
 ##           Functions from amer                     ##
 #######################################################
 
+# I changed the original expand.call in amer to remove the use of .Internal
 expand.call <-
-function(definition=NULL, call=sys.call(sys.parent(1)), expand.dots = TRUE)
-{
-	call <- match.call(definition, call, expand.dots)
-	#given args:
-	ans <- as.list(call)
-	# ans1 <- ans[[1]]
-	# ans <- lapply(ans[-1], eval, envir = sys.frame(sys.parent(2)))
-	# ans <- c(ans1, ans)
-		
-	#possible args:
-	frmls <- formals(safeDeparse(ans[[1]]))
-	#remove formal args with no presets:
-	frmls <- frmls[!sapply(frmls, is.symbol)]
-	
-	add <- which(!(names(frmls) %in% names(ans)))
-	return(as.call(c(ans, frmls[add])))
-}
+  function(call = sys.call(sys.parent(1)))
+  {
+    #given args:
+    ans <- as.list(call)
+    # ans1 <- ans[[1]]
+    # ans <- lapply(ans[-1], eval, envir = sys.frame(sys.parent(2)))
+    # ans <- c(ans1, ans)
+    
+    #possible args:
+    frmls <- formals(safeDeparse(ans[[1]]))
+    #remove formal args with no presets:
+    frmls <- frmls[!sapply(frmls, is.symbol)]
+    
+    add <- which(!(names(frmls) %in% names(ans)))
+    return(as.call(c(ans, frmls[add])))
+  }
 
 
 indsF <-
@@ -318,7 +318,7 @@ tp <-
   function(x, degree=1, k = 15, by=NULL, allPen = FALSE, varying = NULL, diag=FALSE,
            knots= quantile(x, probs = (1:(k - degree))/(k - degree  + 1)), centerscale=NULL, scaledknots=FALSE)
   {
-    call <- as.list(expand.call())
+    call <- as.list(expand.call(match.call()))
     
     stopifnot(is.numeric(x), is.factor(by)||is.null(by), is.numeric(varying)||is.null(varying), degree >= 0)
     
@@ -369,7 +369,7 @@ bsp <- function(x, k=15, spline.degree = 3, diff.ord = 2,
                 knots=NULL, by=NULL, allPen = FALSE, varying = NULL, diag=FALSE)
 {
   require(splines)
-  call <- as.list(expand.call())
+  call <- as.list(expand.call(match.call()))
   stopifnot(diff.ord>=0, spline.degree>=0, is.numeric(x), k > spline.degree)
   
   if(is.null(call$knots)){

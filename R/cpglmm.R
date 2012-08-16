@@ -9,7 +9,7 @@ cpglmm <- function(formula, link = "log", data, weights, offset,
                   basisGenerators = c("tp", "bsp", "sp2d"),
                   optimizer = "nlminb", doFit = TRUE, nAGQ = 1) {
     
-  call <- expand.call()  
+  call <- expand.call(match.call())  
   if (missing(data)) 
     data <- environment(formula)   
   link.power <- make.link.power(link)

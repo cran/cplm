@@ -70,9 +70,6 @@ Wayne (Yanwei) Zhang \email{actuary_zhang@hotmail.com}
 The users are recommended to see \code{\link{cpglm}} for a general introduction to the compound Poisson distribution, \code{\link[lme4]{glmer}} for syntax and usage of mixed-effect models and \code{\link{cpglmm-class}} for detailed explanation of the return value.
 }
 \examples{
-
-\dontrun{
-
 # use Stock and Spacing as main effects and Plant as random effect
 (f1 <- cpglmm(RLD ~ Stock + Spacing +  (1|Plant), data = FineRoot))
             
@@ -99,6 +96,6 @@ anova(f1,f2)
             data = ClaimTriangle))
 
 }            
-}
+
 
 \keyword{models}

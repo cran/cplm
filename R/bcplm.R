@@ -12,7 +12,7 @@ bcplm <- function(formula, link = "log", data, inits = NULL,
                    tune.iter = 5000, n.tune = floor(tune.iter/100),
                    basisGenerators = c("tp", "bsp", "sp2d"), ...) {
 
-  call <- expand.call()  
+  call <- expand.call(match.call())  
   if (missing(data)) 
     data <- environment(formula)   
   link.power <- make.link.power(link)

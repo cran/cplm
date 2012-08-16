@@ -1,7 +1,7 @@
 Package: cplm
 Type: Package
 Title: Compound Poisson linear models
-Version: 0.6-2
+Version: 0.6-4
 Author: Wayne Zhang
 Maintainer: Wayne Zhang <actuary_zhang@hotmail.com>
 Description: Likelihood-based and Bayesian methods for various compound
@@ -14,6 +14,6 @@ License: GPL (>= 2)
 URL: http://code.google.com/p/cplm/, http://www.actuaryzhang.com
 LazyLoad: yes
 LazyData: yes
-Packaged: 2012-08-15 10:26:44 UTC; actuaryzhang
+Packaged: 2012-08-16 13:54:46 UTC; actuaryzhang
 Repository: CRAN
-Date/Publication: 2012-08-15 11:06:09
+Date/Publication: 2012-08-16 15:36:12
