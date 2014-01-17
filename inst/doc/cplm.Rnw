@@ -2,12 +2,13 @@
 % document class from R2WinBUGS
 % To reduce checking time, we include model results directly as verbatim code
 \documentclass{Z}
-\usepackage{RdRW,thumbpdf}
+\usepackage{Rd,thumbpdf}
 \usepackage{mathrsfs, amsmath, amsfonts, amssymb, amsthm}
 \usepackage{bbm}
 \usepackage{verbatim}
 \usepackage{moreverb} 
 \usepackage[utf8]{inputenc}
+\usepackage[margin = 1in]{geometry}
 
 \setlength{\tabcolsep}{1.5pt}
 \setlength{\textheight}{23.5cm}
@@ -71,8 +72,8 @@ theme.novpadding <-
 
 \SweaveOpts{concordance=TRUE}
 If you use this software, please cite:\\
-Zhang, Y. Likelihood-based and Bayesian Methods for Tweedie Compound Poisson Linear Mixed Models, {\em Statistics and Computing}, forthcoming. \\
-\url{http://www.actuaryzhang.com/publication/MixedTweedie.pdf}
+Zhang, Y (2013). Likelihood-based and Bayesian Methods for Tweedie Compound Poisson Linear Mixed Models, {\em Statistics and Computing}, 23, 743-757. \\
+\url{https://cplm.googlecode.com/files/MixedTweedie.pdf}
 
 
 \section{Introduction}
@@ -121,7 +122,7 @@ obj$inits           # or obj@inits
 obj[["inits"]]      # or slot(obj, "inits")
 @
 
-In particular, the \texttt{"cpglmm"} class extends the \texttt{"mer"} class from the \texttt{lme4} package \citep{lme4} directly so that the majority of the methods defined for \texttt{"mer"} can also work directly for a \texttt{"cpglmm"} object. To find out what methods are available for a particular class, say \texttt{"cpglm"}, use the following: 
+To find out what methods are available for a particular class, say \texttt{"cpglm"}, use the following: 
 <<eval = FALSE>>=
 showMethods(classes = "cpglm")
 @
@@ -129,7 +130,7 @@ The help documentation of the available classes and methods can be assessed in t
 <<eval = FALSE>>=
 class ? bcplm
 method ? resid("cpglm") # the "resid" method for class "cpglm" 
-method ? resid("mer")
+method ? resid("cpglmm")
 @
 
  \begin{table}[t]
@@ -252,7 +253,7 @@ where $\bs{\beta}$ and $\bs{b}$ are the vector of fixed and random effects, $\bs
 p(\bs{y}|\bs{\beta}, \phi, p, \bs{\Sigma}) = \int p(\bs{y}|\bs{\beta}, \phi, p, \bs{b}) \cdot p(\bs{b}| \bs{\Sigma}) d\bs{b}.
 \end{equation}
 
-The above integral is often intractable, but can be approximated using the Laplace method or the adaptive Gauss-Hermite quadrature approach. The implementation of these methods is based on the code for \texttt{glmer} in the \texttt{lme4} package \citep{lme4}, with changes made on the updating of the mean, the variance function and the marginal loglikelihood. For the Laplace method, one big difference from \texttt{glmer} is that the contribution of the dispersion parameter to the approximated loglikelihood is explicitly accounted for, which should be more accurate and more consistent with the quadrature estimate. Indeed, both the dispersion parameter and the index parameter are included as a part of the optimization process. In computing the marginal loglikelihood, the density of the compound Poisson distribution is approximated using numerical methods provided by the \texttt{tweedie} package \citep{tweedie}. For details of the Laplace approximation and adaptive Gauss-Hermite quadrature methods for generalized linear mixed models, see the documentation associated with \texttt{lme4}.
+The above integral is often intractable, but can be approximated using the Laplace method or the adaptive Gauss-Hermite quadrature approach. The implementation of these methods is based on the old \texttt{lme4} package (version < 1.0), with changes made on the updating of the mean, the variance function and the marginal loglikelihood. For the Laplace method, the contribution of the dispersion parameter to the approximated loglikelihood is explicitly accounted for, which should be more accurate and more consistent with the quadrature estimate. Indeed, both the dispersion parameter and the index parameter are included as a part of the optimization process. In computing the marginal loglikelihood, the density of the compound Poisson distribution is approximated using numerical methods provided by the \texttt{tweedie} package \citep{tweedie}. For details of the Laplace approximation and adaptive Gauss-Hermite quadrature methods for generalized linear mixed models, see the documentation associated with \texttt{lme4}.
 
 
 We use the fine root data set \citep{Silva;Hall;Tustin;Gandarl:1999} to illustrate various features of the \texttt{cpglmm} function. We are interested at how the distribution of the fine root length density [RLD]  is affected by the geometry of the structural root system and the type of the root stock.
@@ -292,11 +293,11 @@ StockMark:ZoneOuter  -1.16566    0.32468  -3.590
 Estimated dispersion parameter: 0.3286
 Estimated index parameter: 1.4131
 \end{Verbatim}
-The output is similar to that from a call of \texttt{glmer}, but reports additionally the estimates of the dispersion and the index parameters. The result is of class \texttt{cpglmm}, which extends the \texttt{mer} class from the \texttt{lme4} package:
+The output is similar to that from a call of \texttt{glmer}, but reports additionally the estimates of the dispersion and the index parameters. 
 <<>>=
 inherits(f0, "mer")
 @
-As a result, most of the methods defined in \texttt{lme4} are directly applicable:
+As a result, most of the methods defined in (the old) \texttt{lme4} are directly applicable:
 <<>>=
 fixef(f0)  #coefficients
 ranef(f0)
@@ -340,7 +341,7 @@ f3  7 -147.04 -117.390 80.523 41.26      1  1.333e-10 ***
 ---
 Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1  
 \end{Verbatim}
-Different from the \texttt{lme4} package which uses solely the \texttt{nlminb} optimization routine, the \texttt{cpglmm} function allows users to choose alternative optimizers that may perform better in certain circumstances. The \texttt{optimizer} argument determines which optimization routine is to be used. Possible choices are \texttt{"nlminb"} (the default), \texttt{"bobyqa"} and \texttt{"L-BFGS-B"}. We can refit the first example with a different optimizer as follows: 
+In addition, the \texttt{cpglmm} function allows users to choose alternative optimizers that may perform better in certain circumstances. The \texttt{optimizer} argument determines which optimization routine is to be used. Possible choices are \texttt{"nlminb"} (the default), \texttt{"bobyqa"} and \texttt{"L-BFGS-B"}. We can refit the first example with a different optimizer as follows: 
 <<eval = FALSE>>=
 f4 <- cpglmm(RLD ~  Stock * Zone +  (1|Plant), 
             data = FineRoot, optimizer = "L-BFGS-B", 

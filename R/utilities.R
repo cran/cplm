@@ -186,7 +186,7 @@ cpglm.init <- function(fr, link.power = 0){
   fit <- cpglm.fit(fr, p, link.power)
   beta <- as.numeric(fit$coefficients)
   phi <- sum(fit$weights * fit$residuals^2) / fit$df.residual
-  vbeta <- stats:::vcov.glm(fit)
+  vbeta <- summary.glm(fit)$cov.scaled
   list(beta = beta, phi = phi, p = p, vcov = vbeta)
 }
 

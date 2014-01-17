@@ -14,7 +14,7 @@ cpglmm(formula, link = "log", data, weights, offset, subset,
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
-  \item{formula}{a two-sided linear formula object describing the  model structure, with the response on the left of a ~ operator and the terms, separated by + operators, on the right. The vertical bar character "|" separates an expression for a model matrix and a grouping factor. The right side can also include basis generators. See \code{\link[lme4]{glmer}} and \code{basisGenerators} below.}
+  \item{formula}{a two-sided linear formula object describing the  model structure, with the response on the left of a ~ operator and the terms, separated by + operators, on the right. The vertical bar character "|" separates an expression for a model matrix and a grouping factor. The right side can also include basis generators. See \code{lme4} and \code{basisGenerators} below.}
 
   \item{link}{a specification for the model link function. This can be either a literal character string or a numeric number. If it is a character string, it must be one of "log", "identity", "sqrt" or "inverse". If it is numeric, it is the same as the \code{link.power} argument in the \code{\link[statmod]{tweedie}} function. The default is \code{link="log"}.
 }
@@ -26,7 +26,7 @@ cpglmm(formula, link = "log", data, weights, offset, subset,
 \item{inits}{a named list with three components 'beta', 'phi', 'p', 'Sigma' that supply the initial values used in the optimization. If not supplied, the function will generate initial values automatically, which are based on a GLM with the supplied model structure.
 }
   \item{control}{
-a list of parameters for controlling the fitting process. See \code{\link{cpglm}}. For \code{cpglmm}, an additional parameter \code{PQL.init} indicates whether the PQL method (see \code{\link[MASS]{glmmPQL}}) will be used to generate initial values. The default is \code{TRUE}.
+a list of parameters for controlling the fitting process. See \code{\link{cpglm}}. The parameter \code{PQL.init} is not used.
 }
   \item{basisGenerators}{
 a character vector of names of functions that generate spline bases. This is used when smoothing effects are to be included in the model. See \code{\link{tp}} for details. 
@@ -45,7 +45,7 @@ if \code{FALSE}, the constructed \code{"cpglmm"} object is returned before the m
 \details{
 Estimation of compound Poisson mixed models in  existing software has been limited to the Penalized Quasi-Likelihood [PQL] approach (e.g., see \code{\link[MASS]{glmmPQL}}). While straightforward and fast, this method is not equipped to estimate the unknown variance function, i.e., the index parameter. In contrast, the function \code{cpglmm} implements true likelihood-based inferential procedures, i.e., the Laplace approximation and the Adaptive Gauss-Hermite Quadrature (for single grouping factor), so that all parameters in the model can be estimated using maximum likelihood estimation. 
  
-This implementation is based on the code for  \code{\link[lme4]{glmer}} in the \code{lme4} package, with changes made on updating of the mean, the variance function and the marginal loglikelihood. For the Laplace method, one big difference to \code{glmer} is that the contribution of the dispersion parameter to the approximated loglikelihood is explicitly accounted for, which should be more accurate and more consistent with the quadrature estimate. Indeed, both the dispersion parameter and  the index parameter are included as a part of the optimization process. In computing the marginal loglikelihood, the density of the compound Poisson distribution is approximated using numerical methods provided in the \code{tweedie} package. For details of the Laplace approximation and the Gauss-Hermite quadrature method for generalized linear mixed models, see the documentation associated with \code{lme4}. 
+This implementation is based on the older \code{lme4} package (the \code{0.9*} version), with changes made on updating of the mean, the variance function and the marginal loglikelihood. For the Laplace method, the contribution of the dispersion parameter to the approximated loglikelihood is explicitly accounted for, which should be more accurate and more consistent with the quadrature estimate. Indeed, both the dispersion parameter and  the index parameter are included as a part of the optimization process. In computing the marginal loglikelihood, the density of the compound Poisson distribution is approximated using numerical methods provided in the \code{tweedie} package. For details of the Laplace approximation and the Gauss-Hermite quadrature method for generalized linear mixed models, see the documentation associated with \code{lme4}. 
 
 In addition, similar to the package \code{amer} (already retired from CRAN), we provide convenient interfaces for fitting additive models using penalized splines.  See the 'example' section for one such application.  
 
@@ -58,8 +58,9 @@ In addition, similar to the package \code{amer} (already retired from CRAN), we 
 
 
 \references{
-\cite{ Zhang, Y. Likelihood-based and Bayesian Methods for Tweedie Compound Poisson Linear Mixed Models, \emph{Statistics and Computing}, forthcoming. 
-\url{http://www.actuaryzhang.com/publication/MixedTweedie.pdf}}
+\cite{ Zhang, Y (2013). Likelihood-based and Bayesian Methods for Tweedie Compound Poisson Linear Mixed Models, \emph{Statistics and Computing}, 23, 743-757.
+\url{https://cplm.googlecode.com/files/MixedTweedie.pdf}
+}
 }
 
 \author{
@@ -67,13 +68,13 @@ Wayne (Yanwei) Zhang \email{actuary_zhang@hotmail.com}
 }
 
 \seealso{
-The users are recommended to see \code{\link{cpglm}} for a general introduction to the compound Poisson distribution, \code{\link[lme4]{glmer}} for syntax and usage of mixed-effect models and \code{\link{cpglmm-class}} for detailed explanation of the return value.
+The users are recommended to see \code{\link{cpglm}} for a general introduction to the compound Poisson distribution, \code{lme4} for syntax and usage of mixed-effect models and \code{\link{cpglmm-class}} for detailed explanation of the return value.
 }
 \examples{
+\dontrun{
 # use Stock and Spacing as main effects and Plant as random effect
 (f1 <- cpglmm(RLD ~ Stock + Spacing +  (1|Plant), data = FineRoot))
             
-# most of the methods defined in lme4 are directly applicable
 coef(f1); fixef(f1); ranef(f1)  #coefficients
 VarCorr(f1)  #variance components
 
@@ -94,8 +95,7 @@ anova(f1,f2)
 # a model with smoothing effects
 (f5 <- cpglmm(increLoss ~ tp(lag, k = 4) + (1|year) , 
             data = ClaimTriangle))
-
-}            
-
+}
+}
 
 \keyword{models}

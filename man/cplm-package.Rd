@@ -32,8 +32,8 @@ Wayne Zhang <actuary_zhang@hotmail.com>
 a Gini Index. \emph{Journal of the American Statistical Association}, 495, 1085 - 1098.
 }
 
-\cite{ Zhang, Y. Likelihood-based and Bayesian Methods for Tweedie Compound Poisson Linear Mixed Models, \emph{Statistics and Computing}, forthcoming. 
-\url{http://www.actuaryzhang.com/publication/MixedTweedie.pdf}}
+\cite{ Zhang, Y (2013). Likelihood-based and Bayesian Methods for Tweedie Compound Poisson Linear Mixed Models, \emph{Statistics and Computing}, 23, 743-757.
+\url{https://cplm.googlecode.com/files/MixedTweedie.pdf}}
 }
 
 

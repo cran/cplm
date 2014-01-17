@@ -1,4 +1,20 @@
 ================
+Version 0.7-1
+================
+
+CHANGES:
+
+   o remove dependency on lme4 which is now completely re-written 
+
+================
+Version 0.6-4
+================
+
+CHANGES:
+
+   o remove dependency on amer which now is withdrawn from CRAN
+
+================
 Version 0.6-1
 ================
 NEW FEATURES

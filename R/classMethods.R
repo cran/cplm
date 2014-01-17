@@ -12,6 +12,54 @@ setClassUnion("ListFrame", c("list","data.frame"))
 # import from package coda
 setOldClass(c("mcmc", "mcmc.list", "summary.mcmc"))
 
+
+## -------------------- lmer-related Classes --------------------------------
+
+setOldClass("data.frame")
+setOldClass("family")
+setOldClass("logLik")
+
+setClass("mer",
+         representation(## original data
+           env = "environment",# evaluation env for nonlinear model
+           nlmodel = "call",# nonlinear model call
+           frame = "data.frame",# model frame (or empty frame)
+           call = "call",   # matched call
+           flist = "data.frame",  # list of grouping factors
+           X = "matrix",    # fixed effects model matrix
+           Xst = "dgCMatrix", # sparse fixed effects model matrix
+           Zt = "dgCMatrix",# sparse form of Z'
+           pWt = "numeric",# prior weights,
+           offset = "numeric", # length 0 -> no offset
+           y = "numeric",   # response vector
+           ###FIXME: Eliminate the cnames slot.  Put the names on the elements of the ST slot.
+           #                        cnames = "list", # row/column names of els of ST
+           Gp = "integer",  # pointers to row groups of Zt
+           dims = "integer",# dimensions and indicators
+           ## slots that vary during optimization
+           ST = "list", # 
+           V = "matrix",    # gradient matrix
+           A = "dgCMatrix", # (ZTS)'
+           Cm = "dgCMatrix", # AH'G^{-1}W^{1/2} when s > 0
+           Cx = "numeric",  # x slot of Cm when s == 1 (full Cm not stored)
+           L = "CHMfactor", # Cholesky factor of weighted P(AA' + I)P'
+           deviance = "numeric", # ML and REML deviance and components
+           fixef = "numeric",# fixed effects (length p)
+           ranef = "numeric",# random effects (length q)
+           u = "numeric",   # orthogonal random effects (q)
+           eta = "numeric", # unbounded predictor
+           mu = "numeric",  # fitted values at current beta and b
+           muEta = "numeric",# d mu/d eta evaluated at current eta
+           var = "numeric", # conditional variances of Y
+           resid = "numeric",# raw residuals at current beta and b
+           sqrtXWt = "matrix",# sqrt of model matrix row weights
+           sqrtrWt = "numeric",# sqrt of weights used with residuals
+           RZX = "matrix", # dense sol. to L RZX = ST'ZtX = AX
+           RX = "matrix",  # Cholesky factor of downdated X'X
+           ghx = "numeric", # zeros of Hermite polynomial
+           ghw = "numeric"))
+
+
 # class defining slots common to all derived classes 
 setClass("cplm", 
   representation(
@@ -375,7 +423,7 @@ setMethod("vcov", signature(object = "cpglmm"),
     if (FALSE){  
       # compute vcov for phi and p numerically 
       cpglmm_dev <- function(x, ...){
-        parm <- c(.Call(lme4:::mer_ST_getPars, object), 
+        parm <- c(.Call("cpglmm_ST_getPars", object), 
                   object$fixef, log(x[1]), x[2])
         .Call("cpglmm_update_dev", object, parm)  
       }
@@ -387,11 +435,11 @@ setMethod("vcov", signature(object = "cpglmm"),
     rr
 })
 
-
+setGeneric("VarCorr", function(x, ...) standardGeneric("VarCorr"))
 setMethod("VarCorr", signature(x = "cpglmm"),
   function(x, ...){
     sc <- sqrt(x@phi)
-    ans <- lapply(cc <- .Call(lme4:::mer_ST_chol, x),
+    ans <- lapply(cc <- .Call("cpglmm_ST_chol", x),
              function(ch) {
                 val <- crossprod(sc * ch) # variance-covariance
                 stddev <- sqrt(diag(val))
@@ -408,13 +456,30 @@ setMethod("VarCorr", signature(x = "cpglmm"),
 })
 
 
+
+setMethod("logLik", signature(object="cpglmm"),
+          function(object, REML = NULL, ...)
+            ### Extract the log-likelihood or restricted log-likelihood
+          {
+            dims <- object@dims
+            if (is.null(REML) || is.na(REML[1]))
+              REML <- dims[["REML"]]
+            val <- -object@deviance["ML"]/2
+            attr(val, "nall") <- attr(val, "nobs") <- dims[["n"]]
+            attr(val, "df") <-
+              dims[["p"]] + dims[["np"]] + as.logical(dims[["useSc"]])
+            attr(val, "REML") <-  as.logical(REML)
+            class(val) <- "logLik"
+            val
+          })
+
 setMethod("summary", signature(object = "cpglmm"),
   function(object, ...){
     fcoef <- fixef(object)
     vcov <- object@vcov
     dims <- object@dims
     coefs <- cbind("Estimate" = fcoef, "Std. Error" = sqrt(diag(vcov)) )
-    llik <- logLik(object, 0)
+    llik <- logLik(object)
     dev <- object@deviance
     mType <- "LMM"
     mName <- "Compound Poisson linear"
@@ -427,7 +492,7 @@ setMethod("summary", signature(object = "cpglmm"),
                                row.names = "")
     
     varcor <- VarCorr(object)
-    REmat <- lme4:::formatVC(varcor)
+    REmat <- formatVC(varcor)
     if (is.na(attr(varcor, "sc")))
         REmat <- REmat[-nrow(REmat), , drop = FALSE]
 
@@ -435,7 +500,7 @@ setMethod("summary", signature(object = "cpglmm"),
       if (!dims[["useSc"]]) {
         coefs <- coefs[, 1:2, drop = FALSE]
         stat <- coefs[,1]/coefs[,2]
-        pval <- 2*pnorm(abs(stat), lower = FALSE)
+        pval <- 2*pnorm(abs(stat), lower.tail = FALSE)
         coefs <- cbind(coefs, "z value" = stat, "Pr(>|z|)" = pval)
       } else {
         stat <- coefs[,1]/coefs[,2]
@@ -523,7 +588,7 @@ setMethod("show", "cpglmm",
 
 # predict method for cpglmm
 getZt <- function(formula, oldmf, newmf){
-  bars <- lme4:::expandSlash(lme4:::findbars(formula[[3]]))
+  bars <- expandSlash(findbars(formula[[3]]))
   names(bars) <- unlist(lapply(bars, function(x) deparse(x[[3]])))
   fl <- lapply(bars, function(x) {
         oldlvl <- eval(substitute(levels(as.factor(fac)[, drop = TRUE]), 
@@ -685,7 +750,7 @@ print.bcplm <- function(x, digits = max(3, getOption("digits") - 3)){
   if (dims["n.u"] > 0){
     cat("\nRandom and dynamic variance components:\n")
     varcor <- VarCorr(x)
-    REmat <- lme4:::formatVC(varcor)
+    REmat <- formatVC(varcor)
     if (is.na(attr(varcor, "sc")))
       REmat <- REmat[-nrow(REmat), , drop = FALSE]      
     print(REmat, quote = FALSE, digits = digits)

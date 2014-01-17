@@ -27,8 +27,8 @@ cpglmm <- function(formula, link = "log", data, weights, offset,
     fr <- setup$m$fr 
     FL <- setup$m$FL
   } else {  
-    fr <- lme4:::lmerFrames(call, formula, contrasts)
-    FL <- lme4:::lmerFactorList(formula, fr, 0L, 0L)
+    fr <- lmerFrames(call, formula, contrasts)
+    FL <- lmerFactorList(formula, fr, 0L, 0L)
   }
    
   # set control parameters
@@ -36,13 +36,13 @@ cpglmm <- function(formula, link = "log", data, weights, offset,
   FL$dims["mxit"] <- ctr$max.iter
   FL$dims["mxfn"] <- ctr$max.fun
   # get dims 
-  dm <- lme4:::mkZt(FL, NULL)
+  dm <- mkZt(FL, NULL)
   dm$dd["verb"] <- ctr$trace
   # update nAGQ in dd
   if ((nAGQ <- as.integer(nAGQ)) < 1) nAGQ <- 1L
   if (nAGQ %% 2 == 0) nAGQ <- nAGQ + 1L # reset nAGQ to be an odd number
   dm$dd["nAGQ"] <- as.integer(nAGQ)
-  AGQlist <- .Call(lme4:::lme4_ghq, nAGQ)
+  AGQlist <- .Call("cpglmm_ghq", nAGQ)
   M1 <- length(levels(dm$flist[[1]]))
   n <- ncol(dm$Zt)
   q <- dm$dd[["q"]]
@@ -74,48 +74,20 @@ cpglmm <- function(formula, link = "log", data, weights, offset,
   # muEta and var are not initialized so that lmer is fitted when PQL.init is TRUE
   ans <- new(Class = "cpglmm", env = new.env( ), nlmodel = (~I(x))[[2]], 
              frame = fr$mf, call = call, flist = dm$flist, 
-             Zt = dm$Zt, X = fr$X, y = as.numeric(fr$Y), pWt = fr$wts, 
+             Zt = dm$Zt, X = fr$X, y = as.numeric(fr$Y), 
+             pWt = fr$wts, offset = fr$off,
              Gp = unname(dm$Gp), dims = dm$dd, 
              ST = dm$ST, A = dm$A, Cm = dm$Cm, Cx = (dm$A)@x, L = dm$L, 
              deviance = dm$dev, fixef = inits$beta, ranef = numeric(q), 
              u = numeric(q), eta = numeric(n), 
              mu = numeric(n), resid = numeric(n), 
+             muEta = numeric(n), var = numeric(n),
              sqrtXWt = as.matrix(numeric(n)), sqrtrWt = numeric(n), 
              RZX = matrix(0, q, d), RX = matrix(0, d, d), 
              ghx = AGQlist[[1]], ghw = AGQlist[[2]], 
              p = inits$p, phi = inits$phi, link.power = as.double(link.power), 
              bound.p = ctr$bound.p, formula = formula, contrasts = contrasts,
              model.frame = fr$mf, inits = inits, vcov = matrix(0, d, d), smooths = list())
-  
-  # run the PQL method to improve initial values
-  if (ctr$PQL.init) {
-    ST <- ans@ST
-    eta <- as.numeric(fr$X %*% inits$beta  + fr$off)    
-    fam <- tweedie(1.5, link.power)        
-    while (1) {
-      etaold <- eta
-      mu.eta.val <- fam$mu.eta(eta)
-      mu <- fam$linkinv(eta)
-      ans@y <- eta + (fr$Y - mu)/mu.eta.val - fr$off
-      ans@pWt <- fr$wts * mu.eta.val^2/fam$variance(mu)
-      .Call(lme4:::mer_optimize, ans)
-      .Call(lme4:::mer_update_ranef, ans)
-      .Call(lme4:::mer_update_mu, ans)
-      eta <- ans@eta + fr$off
-      if (sum((eta - etaold)^2) < 1e-06 * sum(eta^2)) 
-        break    
-    }
-    # reset y and pWt 
-    ans@y <- as.numeric(fr$Y)
-    ans@pWt <- fr$wts        
-    # reset ST if the estimate from PQL is degenerate
-    if (any(sapply(ans@ST, det) < 1e-8)) ans@ST <- ST
-  }    
-
-  # initialize muEta and var to fit glmer  
-  ans@muEta <-  numeric(n) 
-  ans@var <- numeric(n)
-  ans@offset <- fr$off
   
   # return cpglmm object if model fitting is turned off
   if (!doFit)  return(ans)
@@ -124,7 +96,7 @@ cpglmm <- function(formula, link = "log", data, weights, offset,
   if (optimizer == "nlminb") {
     invisible(.Call("cpglmm_optimize", ans))
     if (ans@dims[["cvg"]] > 6) 
-        warning(lme4:::convergenceMessage(ans@dims[["cvg"]]))
+        warning(convergenceMessage(ans@dims[["cvg"]]))
   } else {    
     # function to be fed to optimizers (return deviance)
     # parm: theta + beta + log(phi) + p
@@ -132,7 +104,7 @@ cpglmm <- function(formula, link = "log", data, weights, offset,
       .Call("cpglmm_update_dev", ans, parm) 
     }
     # initial values for theta, beta, log(phi), p, 
-    parm <- c(.Call(lme4:::mer_ST_getPars, ans), ans$fixef, log(ans$phi), ans$p) 
+    parm <- c(.Call("cpglmm_ST_getPars", ans), ans$fixef, log(ans$phi), ans$p) 
     parm <- unname(parm)
     # set bounds
     n.parm <- length(parm)
@@ -154,13 +126,13 @@ cpglmm <- function(formula, link = "log", data, weights, offset,
     invisible(.Call("cpglmm_update_dev", ans, rslt$par))    
   }
   # update random effects 
-  invisible(.Call(lme4:::mer_update_ranef, ans))  
+  invisible(.Call("cpglmm_update_ranef", ans))  
   # update sigmaML to be used in postVar
   dev <- ans@deviance 
   dev['sigmaML'] <- sqrt(ans@phi)
   ans@deviance <- dev 
   # update vcov in ans
-  invisible(.Call(lme4:::mer_update_RX, ans))
+  invisible(.Call("cpglmm_update_RX", ans))
   ans@vcov <- vcov(ans)
   # add smooth terms 
   if (n.f) {

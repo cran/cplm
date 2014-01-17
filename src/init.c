@@ -30,6 +30,15 @@ static R_CallMethodDef CallEntries[] = {
     CALLDEF(bcplm_post_betak, 2),
     CALLDEF(bcplm_post_uk, 2),
     CALLDEF(bcplm_metrop_rw, 7),
+    CALLDEF(mer_ST_initialize, 3),
+    CALLDEF(mer_create_L, 1),
+    CALLDEF(mer_postVar, 2),
+    CALLDEF(mer_update_projection, 1),
+    CALLDEF(cpglmm_ghq, 1),
+    CALLDEF(cpglmm_update_RX, 1),
+    CALLDEF(cpglmm_update_ranef, 1),
+    CALLDEF(cpglmm_ST_chol, 1),
+    CALLDEF(cpglmm_ST_getPars, 1),
     {NULL, NULL, 0}
 };
 

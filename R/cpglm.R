@@ -68,7 +68,7 @@ cpglm.profile <- function(fr, link.power = 0, control = list(),
              p = p.max, phi = phi.max, iter = fit$iter, converged = fit$converged,
              link.power= link.power, model.frame = fr$mf, na.action = NULL,
              offset = fr$offset, prior.weights = fit$prior.weights, y = fr$Y,
-             inits = NULL, vcov = stats:::vcov.glm(fit))
+             inits = NULL, vcov = summary.glm(fit)$cov.scaled)
   return(out)  
 }               
 

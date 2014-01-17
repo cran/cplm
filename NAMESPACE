@@ -5,17 +5,29 @@ useDynLib(cplm, .registration = TRUE)
 ############################
 import(Matrix)
 import(coda)
+import(ggplot2)
+import(biglm)
 importFrom(minqa, bobyqa)
 importFrom(reshape2, melt)
 importFrom(statmod, tweedie)
 importFrom(tweedie, dtweedie.series, dtweedie, tweedie.dev)
-importFrom(stats, predict)
 importMethodsFrom(methods, show)
-importClassesFrom(lme4, mer, summary.mer)
-importMethodsFrom(lme4, fixef, VarCorr, vcov, mcmcsamp, residuals, resid,
-			fitted, terms, formula, deviance, model.matrix, 
-			coef, plot)
-importMethodsFrom(stats4, AIC)
+importFrom(nlme, fixef, ranef, VarCorr)
+importFrom("stats4", AIC, BIC, logLik)# so S4 methods are used!
+importFrom("stats",
+           anova,
+           coef,
+           confint,
+           deviance,
+           fitted,
+           formula,
+           model.frame,
+           model.matrix,
+           predict,
+           residuals, resid,  
+           terms,
+           vcov
+           )
 
 
 ############################
@@ -32,6 +44,6 @@ exportClasses(NullNum, NullList, NullFunc, ListFrame)
            
 #Methods
 exportMethods(summary, show,  "$", "[[", "[", names, coef, vcov, 
-              residuals, resid, fitted, 
+              residuals, resid, fitted, fixef, ranef, logLik, anova, 
 		  AIC, deviance, terms, formula, model.matrix, plot,
 		  VarCorr, predict)

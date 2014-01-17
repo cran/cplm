@@ -22,7 +22,7 @@ bcplm(formula, link = "log", data, inits = NULL,
 }
 
 \arguments{
- \item{formula}{an object of class \code{formula}. See \code{\link[stats]{glm}} and \code{\link[lme4]{glmer}} for details.
+ \item{formula}{an object of class \code{formula}. See \code{\link[stats]{glm}} and \code{cpglmm} for details.
 }
   \item{link}{a specification for the model link function. This can be either a literal character string or a numeric number. If it is a character string, it must be one of "log", "identity", "sqrt" or "inverse". If it is numeric, it is the same as the \code{link.power} argument in the \code{\link[statmod]{tweedie}} function. The default is \code{link = "log"}.
 }
@@ -92,8 +92,9 @@ The simulated values of all model parameters are stored in the  \code{sims.list}
 }
 
 \references{
-\cite{ Zhang, Y. Likelihood-based and Bayesian Methods for Tweedie Compound Poisson Linear Mixed Models, \emph{Statistics and Computing}, forthcoming. 
-\url{http://www.actuaryzhang.com/publication/MixedTweedie.pdf}}
+\cite{ Zhang, Y (2013). Likelihood-based and Bayesian Methods for Tweedie Compound Poisson Linear Mixed Models, \emph{Statistics and Computing}, 23, 743-757.
+\url{https://cplm.googlecode.com/files/MixedTweedie.pdf}
+}
 }
 
 \author{

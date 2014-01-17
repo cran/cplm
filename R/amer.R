@@ -27,7 +27,7 @@ indsF <-
     # add assign-like info to fctterm:
     # which penalization/ranef groups and coefficients (fixed/random) belong to which function 
     # also include info on global intercept and by-level intercepts  
-    ranefinds <- lme4:::reinds(m@Gp)
+    ranefinds <- reinds(m@Gp)
     
     indIntercept <- ifelse("(Intercept)" %in% names(fixef(m)), 1, 0)
     
@@ -368,7 +368,7 @@ tp <-
 bsp <- function(x, k=15, spline.degree = 3, diff.ord = 2, 
                 knots=NULL, by=NULL, allPen = FALSE, varying = NULL, diag=FALSE)
 {
-  require(splines)
+  
   call <- as.list(expand.call(match.call()))
   stopifnot(diff.ord>=0, spline.degree>=0, is.numeric(x), k > spline.degree)
   

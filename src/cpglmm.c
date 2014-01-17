@@ -38,6 +38,9 @@ extern cholmod_common c;
 #define CM_TOL      1e-10
 /** Minimum step factor in update_u */
 #define CM_SMIN     1e-5
+/** precision and maximum number of iterations used in GHQ */
+#define GHQ_EPS    1e-15
+#define GHQ_MAXIT  40
 
 /** positions in the deviance vector */
 enum devP {
@@ -645,7 +648,211 @@ SEXP cpglmm_optimize(SEXP x)
 }
 
 
-/* functions callable from R */
+/**
+ * Create PAX in dest.
+ *
+ * @param dest values to be calculated
+ * @param perm NULL or a 0-based permutation vector defining P
+ * @param A sparse matrix
+ * @param X dense matrix
+ * @param nc number of columns in X
+ *
+ */
+static void
+P_sdmult(double *dest, const int *perm, const CHM_SP A,
+	 const double *X, int nc)
+{
+    int *ai = (int*)(A->i), *ap = (int*)(A->p), m = A->nrow, n = A->ncol;
+    double *ax = (double*)(A->x), *tmp = Calloc(m, double);
+    R_CheckStack();
+
+    for (int k = 0; k < nc; k++) {
+	AZERO(tmp, m);
+	for (int j = 0; j < n; j++) {
+	    for (int p = ap[j]; p < ap[j + 1]; p++)
+		tmp[ai[p]] += X[j + k * n] * ax[p];
+	}
+	apply_perm(dest + k * m, tmp, perm, m);
+    }
+    Free(tmp);
+}
+
+
+/**
+ * Update the RZX and RX slots in an mer object. update_L should be
+ * called before update_RX
+ *
+ * @param x pointer to an mer object
+ *
+ * @return profiled deviance or REML deviance
+ */
+static double update_RX(SEXP x)
+{
+    int *dims = DIMS_SLOT(x), info;
+    int n = dims[n_POS], p = dims[p_POS], q = dims[q_POS], s = dims[s_POS];
+    double *cx = Cx_SLOT(x), *d = DEV_SLOT(x),
+	*RZX = RZX_SLOT(x), *RX = RX_SLOT(x), *sXwt = SXWT_SLOT(x),
+	*WX = (double*) NULL, *X = X_SLOT(x),
+	mone[] = {-1,0}, one[] = {1,0}, zero[] = {0,0};
+    CHM_SP A = A_SLOT(x);
+    CHM_FR L = L_SLOT(x);
+    CHM_DN cRZX = N_AS_CHM_DN(RZX, q, p), ans;
+    R_CheckStack();
+
+    if (sXwt) {			/* Create W^{1/2}GHX in WX */
+	WX = Calloc(n * p, double);
+
+	AZERO(WX, n * p);
+	for (int j = 0; j < p; j++)
+	    for (int k = 0; k < s; k++)
+		for (int i = 0; i < n; i++)
+		    WX[i + j * n] +=
+			sXwt[i + k * n] * X[i + n * (k + j * s)];
+	X = WX;
+	/* Replace A by C, either just the x component or the entire matrix */
+	if (cx) A->x = (void*)cx;
+	else {
+	    A = Cm_SLOT(x);
+	    R_CheckStack();
+	}
+    }
+				/* solve L %*% RZX = PAW^{1/2}GHX */
+    P_sdmult(RZX, (int*)L->Perm, A, X, p); /* right-hand side */
+    ans = M_cholmod_solve(CHOLMOD_L, L, cRZX, &c); /* solution */
+    Memcpy(RZX, (double*)(ans->x), q * p);
+    M_cholmod_free_dense(&ans, &c);
+    				/* downdate X'X and factor  */
+    F77_CALL(dsyrk)("U", "T", &p, &n, one, X, &n, zero, RX, &p); /* X'X */
+    F77_CALL(dsyrk)("U", "T", &p, &q, mone, RZX, &q, one, RX, &p);
+    F77_CALL(dpotrf)("U", &p, RX, &p, &info);
+    if (info)
+	error(_("Downdated X'X is not positive definite, %d."), info);
+				/* accumulate log(det(RX)^2)  */
+    d[ldRX2_POS] = 0;
+    for (int j = 0; j < p; j++) d[ldRX2_POS] += 2 * log(RX[j * (p + 1)]);
+
+    if (WX) Free(WX);
+    return d[ML_POS];
+}
+
+
+
+/**
+ * Generate zeros and weights of Hermite polynomial of order N, for AGQ method
+ *
+ * changed from fortran in package 'glmmML'
+ * @param N order of the Hermite polynomial
+ * @param x zeros of the polynomial, abscissas for AGQ
+ * @param w weights used in AGQ
+ *
+ */
+
+static void internal_ghq(int N, double *x, double *w)
+{
+    int NR, IT, I, K, J;
+    double Z = 0, HF = 0, HD = 0;
+    double Z0, F0, F1, P, FD, Q, WP, GD, R, R1, R2;
+    double HN = 1/(double)N;
+    double *X = Calloc(N + 1, double), *W = Calloc(N + 1, double);
+
+    for(NR = 1; NR <= N / 2; NR++){
+	if(NR == 1)
+	    Z = -1.1611 + 1.46 * sqrt((double)N);
+	else
+	    Z -= HN * (N/2 + 1 - NR);
+	for (IT = 0; IT <= GHQ_MAXIT; IT++) {
+	    Z0 = Z;
+	    F0 = 1.0;
+	    F1 = 2.0 * Z;
+	    for(K = 2; K <= N; ++K){
+		HF = 2.0 * Z * F1 - 2.0 * (double)(K - 1.0) * F0;
+		HD = 2.0 * K * F1;
+		F0 = F1;
+		F1 = HF;
+	    }
+	    P = 1.0;
+	    for(I = 1; I <= NR-1; ++I){
+		P *= (Z - X[I]);
+	    }
+	    FD = HF / P;
+	    Q = 0.0;
+	    for(I = 1; I <= NR - 1; ++I){
+		WP = 1.0;
+		for(J = 1; J <= NR - 1; ++J){
+		    if(J != I) WP *= ( Z - X[J] );
+		}
+		Q += WP;
+	    }
+	    GD = (HD-Q*FD)/P;
+	    Z -= (FD/GD);
+	    if (fabs((Z - Z0) / Z) < GHQ_EPS) break;
+	}
+
+	X[NR] = Z;
+	X[N+1-NR] = -Z;
+	R=1.0;
+	for(K = 1; K <= N; ++K){
+	    R *= (2.0 * (double)K );
+	}
+	W[N+1-NR] = W[NR] = 3.544907701811 * R / (HD*HD);
+    }
+
+    if( N % 2 ){
+	R1=1.0;
+	R2=1.0;
+	for(J = 1; J <= N; ++J){
+	    R1=2.0*R1*J;
+	    if(J>=(N+1)/2) R2 *= J;
+	}
+	W[N/2+1]=0.88622692545276*R1/(R2*R2);
+	X[N/2+1]=0.0;
+    }
+
+    Memcpy(x, X + 1, N);
+    Memcpy(w, W + 1, N);
+
+    if(X) Free(X);
+    if(W) Free(W);
+}
+
+
+/**
+ * Update the contents of the ranef slot in an mer object using the
+ * current contents of the u and ST slots.
+ *
+ * b = T  %*% S %*% t(P) %*% u
+ *
+ * @param x an mer object
+ */
+static void update_ranef(SEXP x)
+{
+    int *Gp = Gp_SLOT(x), *dims = DIMS_SLOT(x), *perm = PERM_VEC(x);
+    int nt = dims[nt_POS], q = dims[q_POS];
+    double *b = RANEF_SLOT(x), *u = U_SLOT(x), one[] = {1,0};
+    int *nc = Alloca(nt, int), *nlev = Alloca(nt, int);
+    double **st = Alloca(nt, double*);
+    R_CheckStack();
+
+    ST_nc_nlev(GET_SLOT(x, install("ST")), Gp, st, nc, nlev);
+				/* inverse permutation */
+    for (int i = 0; i < q; i++) b[perm[i]] = u[i];
+    for (int i = 0; i < nt; i++) {
+	for (int k = 0; k < nc[i]; k++) { /* multiply by \tilde{S}_i */
+	    double dd = st[i][k * (nc[i] + 1)];
+	    int base = Gp[i] + k * nlev[i];
+	    for (int kk = 0; kk < nlev[i]; kk++) b[base + kk] *= dd;
+	}
+	if (nc[i] > 1) {	/* multiply by \tilde{T}_i */
+	    F77_CALL(dtrmm)("R", "L", "T", "U", nlev + i, nc + i, one,
+			    st[i], nc + i, b + Gp[i], nlev + i);
+	}
+    }
+}
+
+
+/*******************************************************
+ *            functions callable from R                *
+********************************************************/
 
 /**
  * R callable function to update L
@@ -705,4 +912,342 @@ SEXP cpglmm_update_dev(SEXP x, SEXP pm){
 SEXP cpglmm_setPars(SEXP x, SEXP pm){  
     cp_setPars(x, REAL(pm)) ;
     return R_NilValue ;      
+}
+
+/**
+ * Extract the parameters from the ST slot of an mer object
+ *
+ * @param x an mer object
+ *
+ * @return pointer to a REAL vector
+ */
+SEXP cpglmm_ST_getPars(SEXP x)
+{
+    SEXP ans = PROTECT(allocVector(REALSXP, DIMS_SLOT(x)[np_POS]));
+    ST_getPars(x, REAL(ans));
+
+    UNPROTECT(1);
+    return ans;
+}
+
+
+/**
+ * Return a list of (upper) Cholesky factors from the ST list
+ *
+ * @param x an mer object
+ *
+ * @return a list of upper Cholesky factors
+ */
+SEXP cpglmm_ST_chol(SEXP x)
+{
+  SEXP ans = PROTECT(duplicate(GET_SLOT(x, install("ST"))));
+    int nt = DIMS_SLOT(x)[nt_POS];
+    int *nc = Alloca(nt, int), *nlev = Alloca(nt, int);
+    double **st = Alloca(nt, double*);
+    R_CheckStack();
+
+    ST_nc_nlev(ans, Gp_SLOT(x), st, nc, nlev);
+    for (int k = 0; k < nt; k++) {
+	if (nc[k] > 1) {	/* nothing to do for nc[k] == 1 */
+	    int nck = nc[k], nckp1 = nc[k] + 1;
+	    double *stk = st[k];
+
+	    for (int j = 0; j < nck; j++) {
+		double dd = stk[j * nckp1]; /* diagonal el */
+		for (int i = j + 1; i < nck; i++) {
+		    stk[j + i * nck] = dd * stk[i + j * nck];
+		    stk[i + j * nck] = 0;
+		}
+	    }
+	}
+    }
+
+    UNPROTECT(1);
+    return ans;
+}
+
+
+
+/**
+ * Externally callable update_ranef.
+ * Update the contents of the ranef slot in an mer object.  For a
+ * linear mixed model the conditional estimates of the fixed effects
+ * and the conditional mode of u are evaluated first.
+ *
+ * @param x an mer object
+ *
+ * @return R_NilValue
+ */
+SEXP cpglmm_update_ranef(SEXP x)
+{
+    update_ranef(x);
+    return R_NilValue;
+}
+
+
+/**
+ * Externally callable update_RX
+ *
+ * @param x pointer to an mer object
+ *
+ * @return profiled deviance or REML deviance
+ */
+SEXP cpglmm_update_RX(SEXP x)
+{
+    return ScalarReal(update_RX(x));
+}
+
+/**
+ * Return zeros and weights of Hermite polynomial of order n as a list
+ *
+ * @param np pointer to a scalar integer SEXP
+ * @return a list with two components, the abscissas and the weights.
+ *
+ */
+SEXP cpglmm_ghq(SEXP np)
+{
+    int n = asInteger(np);
+    SEXP ans = PROTECT(allocVector(VECSXP, 2));
+
+    if (n < 1) n = 1;
+    SET_VECTOR_ELT(ans, 0, allocVector(REALSXP, n ));
+    SET_VECTOR_ELT(ans, 1, allocVector(REALSXP, n ));
+
+    internal_ghq(n, REAL(VECTOR_ELT(ans, 0)), REAL(VECTOR_ELT(ans, 1)));
+    UNPROTECT(1);
+    return ans;
+}
+
+
+
+/**
+ * Evaluate starting estimates for the elements of ST
+ *
+ * @param ST pointers to the nt ST factorizations of the diagonal
+ *     elements of Sigma
+ * @param Gpp length nt+1 vector of group pointers for the rows of Zt
+ * @param Zt transpose of Z matrix
+ *
+ */
+SEXP mer_ST_initialize(SEXP ST, SEXP Gpp, SEXP Zt)
+{
+    int *Gp = INTEGER(Gpp),
+	*Zdims = INTEGER(GET_SLOT(Zt, install("Dim"))),
+	*zi = INTEGER(GET_SLOT(Zt, install("i"))), nt = LENGTH(ST);
+    int *nc = Alloca(nt, int), *nlev = Alloca(nt, int),
+	nnz = INTEGER(GET_SLOT(Zt, install("p")))[Zdims[1]];
+    double *rowsqr = Calloc(Zdims[0], double),
+	**st = Alloca(nt, double*),
+	*zx = REAL(GET_SLOT(Zt, install("x")));
+    R_CheckStack();
+
+    ST_nc_nlev(ST, Gp, st, nc, nlev);
+    AZERO(rowsqr, Zdims[0]);
+    for (int i = 0; i < nnz; i++) rowsqr[zi[i]] += zx[i] * zx[i];
+    for (int i = 0; i < nt; i++) {
+	AZERO(st[i], nc[i] * nc[i]);
+	for (int j = 0; j < nc[i]; j++) {
+	    double *stij = st[i] + j * (nc[i] + 1);
+	    for (int k = 0; k < nlev[i]; k++)
+		*stij += rowsqr[Gp[i] + j * nlev[i] + k];
+	    *stij = sqrt(nlev[i]/(0.375 * *stij));
+	}
+    }
+    Free(rowsqr);
+    return R_NilValue;
+}
+
+
+
+
+/**
+ * Create and initialize L
+ *
+ * @param CmP pointer to the model matrix for the orthogonal random
+ * effects (transposed)
+ *
+ * @return L
+ */
+SEXP mer_create_L(SEXP CmP)
+{
+    double one[] = {1, 0};
+    CHM_SP Cm = AS_CHM_SP(CmP);
+    CHM_FR L;
+    R_CheckStack();
+
+    L = M_cholmod_analyze(Cm, &c);
+    if (!M_cholmod_factorize_p(Cm, one, (int*)NULL, 0 /*fsize*/, L, &c))
+	error(_("cholmod_factorize_p failed: status %d, minor %d from ncol %d"),
+	      c.status, L->minor, L->n);
+
+    return M_chm_factor_to_SEXP(L, 1);
+}
+
+
+
+/**
+ * Extract the conditional variances of the random effects in an mer
+ * object.  Some people called these posterior variances, hence the name.
+ *
+ * @param x pointer to an mer object
+ * @param which pointer to a logical vector
+ *
+ * @return pointer to a list of arrays
+ */
+SEXP mer_postVar(SEXP x, SEXP which)
+{
+    int *Gp = Gp_SLOT(x), *dims = DIMS_SLOT(x), *ww;
+    SEXP ans, flistP = GET_SLOT(x, install("flist"));
+    const int nf = LENGTH(flistP), nt = dims[nt_POS], q = dims[q_POS];
+    int nr = 0, pos = 0;
+    /* int *asgn = INTEGER(getAttrib(flistP, install("assign"))); */
+    double *vv, one[] = {1,0}, sc;
+    CHM_SP sm1, sm2;
+    CHM_DN dm1;
+    CHM_FR L = L_SLOT(x);
+    int *Perm = (int*)(L->Perm), *iperm = Calloc(q, int),
+	*nc = Alloca(nt, int), *nlev = Alloca(nt, int);
+    double **st = Alloca(nt, double*);
+    R_CheckStack();
+
+/* FIXME: Write the code for nt != nf */
+    if (nt != nf) error(_("Code not written yet"));
+				/* determine length of list to return */
+    if (!isLogical(which) || LENGTH(which) != nf)
+	error(_("which must be a logical vector of length %d"), nf);
+    ww = LOGICAL(which);
+    for (int i = 0; i < nt; i++) if (ww[i]) nr++;
+    if (!nr) return(allocVector(VECSXP, 0));
+    ans = PROTECT(allocVector(VECSXP, nr));
+
+    ST_nc_nlev(GET_SLOT(x, install("ST")), Gp, st, nc, nlev);
+    for (int j = 0; j < q; j++) iperm[Perm[j]] = j; /* inverse permutation */
+    sc = dims[useSc_POS] ?
+	(DEV_SLOT(x)[dims[isREML_POS] ? sigmaREML_POS : sigmaML_POS]) : 1;
+    for (int i = 0; i < nt; i++) {
+	if (ww[i]) {
+	    const int nci = nc[i];
+	    const int ncisqr = nci * nci;
+	    CHM_SP rhs = M_cholmod_allocate_sparse(q, nci, nci,
+						   1/*sorted*/, 1/*packed*/,
+						   0/*stype*/, CHOLMOD_REAL, &c);
+
+	    SET_VECTOR_ELT(ans, pos, alloc3DArray(REALSXP, nci, nci, nlev[i]));
+	    vv = REAL(VECTOR_ELT(ans, pos));
+	    pos++;
+	    for (int j = 0; j <= nci; j++) ((int *)(rhs->p))[j] = j;
+	    for (int j = 0; j < nci; j++)
+		((double *)(rhs->x))[j] = st[i][j * (nci + 1)] * sc;
+	    for (int k = 0; k < nlev[i]; k++) {
+		double *vvk = vv + k * ncisqr;
+		for (int j = 0; j < nci; j++)
+		    ((int*)(rhs->i))[j] = iperm[Gp[i] + k + j * nlev[i]];
+		sm1 = M_cholmod_spsolve(CHOLMOD_L, L, rhs, &c);
+		sm2 = M_cholmod_transpose(sm1, 1 /*values*/, &c);
+		M_cholmod_free_sparse(&sm1, &c);
+		sm1 = M_cholmod_aat(sm2, (int*)NULL, (size_t)0, 1 /*mode*/, &c);
+		dm1 = M_cholmod_sparse_to_dense(sm1, &c);
+		M_cholmod_free_sparse(&sm1, &c); M_cholmod_free_sparse(&sm2, &c);
+		Memcpy(vvk, (double*)(dm1->x), ncisqr);
+		M_cholmod_free_dense(&dm1, &c);
+		if (nci > 1) {
+		    F77_CALL(dtrmm)("L", "L", "N", "U", nc + i, nc + i,
+				    one, st[i], nc + i, vvk, nc + i);
+		    F77_CALL(dtrmm)("R", "L", "T", "U", nc + i, nc + i,
+				    one, st[i], nc + i, vvk, nc + i);
+		}
+	    }
+	    M_cholmod_free_sparse(&rhs, &c);
+	}
+    }
+    Free(iperm);
+    UNPROTECT(1);
+    return ans;
+}
+
+
+
+/**
+ * Update the projections of the response vector onto the column
+ * spaces of the random effects and the fixed effects.  This function
+ * is needed separately for the one-argument form of the anova function.
+ *
+ * @param x an mer object
+ * @param pb position to store the random-effects projection
+ * @param pbeta position to store the fixed-effects projection
+ */
+static void lmm_update_projection(SEXP x, double *pb, double *pbeta)
+{
+    int *dims = DIMS_SLOT(x), i1 = 1;
+    int n = dims[n_POS], p = dims[p_POS], q = dims[q_POS];
+    double *WX = (double*) NULL, *X = X_SLOT(x),
+	*cx = Cx_SLOT(x), *d = DEV_SLOT(x),
+	*off = OFFSET_SLOT(x), *RZX = RZX_SLOT(x),
+	*RX = RX_SLOT(x), *sXwt = SXWT_SLOT(x),
+	*wy = (double*)NULL, *y = Y_SLOT(x),
+	mone[] = {-1,0}, one[] = {1,0}, zero[] = {0,0};
+    CHM_SP A = A_SLOT(x);
+    CHM_FR L = L_SLOT(x);
+    CHM_DN cpb = N_AS_CHM_DN(pb, q, 1), sol;
+    R_CheckStack();
+
+    wy = Calloc(n, double);
+    for (int i = 0; i < n; i++) wy[i] = y[i] - (off ? off[i] : 0);
+    if (sXwt) {		     /* Replace X by weighted X and weight wy */
+	if (!cx) error(_("Cx slot has zero length when sXwt does not."));
+
+	A->x = (void*)cx;
+	WX = Calloc(n * p, double);
+
+	for (int i = 0; i < n; i++) {
+	    wy[i] *= sXwt[i];
+	    for (int j = 0; j < p; j++)
+		WX[i + j * n] = sXwt[i] * X[i + j * n];
+	}
+	X = WX;
+    }
+				/* solve L del1 = PAy */
+    P_sdmult(pb, (int*)L->Perm, A, wy, 1);
+    sol = M_cholmod_solve(CHOLMOD_L, L, cpb, &c);
+    Memcpy(pb, (double*)sol->x, q);
+    M_cholmod_free_dense(&sol, &c);
+				/* solve RX' del2 = X'y - RZX'del1 */
+    F77_CALL(dgemv)("T", &n, &p, one, X, &n,
+		    wy, &i1, zero, pbeta, &i1);
+    F77_CALL(dgemv)("T", &q, &p, mone, RZX, &q,
+		    pb, &i1, one, pbeta, &i1);
+    F77_CALL(dtrsv)("U", "T", "N", &p, RX, &p, pbeta, &i1);
+    d[pwrss_POS] = sqr_length(wy, n)
+	- (sqr_length(pbeta, p) + sqr_length(pb, q));
+    if (d[pwrss_POS] < 0)
+	error(_("Calculated PWRSS for a LMM is negative"));
+    Free(wy);
+    if (WX) Free(WX);
+}
+
+
+
+/**
+ * Externally callable lmm_update_projection.
+ * Create the projections onto the column spaces of the random effects
+ * and the fixed effects.
+ *
+ * @param x an mer object
+ *
+ * @return a list with two elements, both REAL vectors
+ */
+SEXP mer_update_projection(SEXP x)
+{
+    SEXP ans = PROTECT(allocVector(VECSXP, 2));
+    int *dims = DIMS_SLOT(x);
+
+    SET_VECTOR_ELT(ans, 0, allocVector(REALSXP, dims[q_POS]));
+    SET_VECTOR_ELT(ans, 1, allocVector(REALSXP, dims[p_POS]));
+    lmm_update_projection(x,
+			  /* pb = */
+			  REAL(VECTOR_ELT(ans, 0)),
+			  /* pbeta = */
+			  REAL(VECTOR_ELT(ans, 1)));
+    UNPROTECT(1);
+    return ans;
 }

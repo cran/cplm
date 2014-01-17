@@ -46,6 +46,40 @@ frFL <- function (formula, data, family, control = list(),
     return(list(m = m, fct = fct, fctterm = fctterm))
 }
 
+
+### The main event
+lmer <-
+  function(formula, data, family = NULL, REML = TRUE,
+           control = list(), start = NULL, verbose = FALSE, doFit = TRUE,
+           subset, weights, na.action, offset, contrasts = NULL,
+           model = TRUE, x = TRUE, ...)
+    ### Linear Mixed-Effects in R
+  {
+    mc <- match.call()
+    if (!is.null(family)) {             # call glmer
+      mc[[1]] <- as.name("glmer")
+      return(eval.parent(mc))
+    }
+    stopifnot(length(formula <- as.formula(formula)) == 3)
+    
+    fr <- lmerFrames(mc, formula, contrasts) # model frame, X, etc.
+    FL <- lmerFactorList(formula, fr, rmInt=FALSE, drop=FALSE) # flist, Zt, dims
+    largs <- list(...)
+    if (!is.null(method <- largs$method)) {
+      warning(paste("Argument", sQuote("method"),
+                    "is deprecated.  Use", sQuote("REML"),
+                    "instead"))
+      REML <- match.arg(method, c("REML", "ML")) == "REML"
+      largs <- largs[names(largs) != "method"]
+    }
+    ### FIXME: issue a warning if the control argument has an msVerbose component    
+    FL$dims["LMM"] <- 1L
+    FL$dims["mxit"] <- 500L
+    FL$dims["mxfn"] <- 1000L
+    ans <- list(fr = fr, FL = FL, start = start)
+    ans
+  }
+
 ############################
 # function for 2d splines (from Ngo and Wand)
 ############################
@@ -116,30 +150,7 @@ getF <- function (object, which, n=100, newdata=NULL, interval = c("NONE", "MCMC
     which <- which[!nas]
   }
   if(length(addConst) != length(which)) addConst <- rep(addConst, length=length(which))
-  
-  if(interval=="MCMC"){
-    #FIXME: these are sometimes HUGE compared to RW, with strange shapes and/or not overlapping the posterior means/modes 
-    #		- cannot be just because variability of variance estimates enters here but not in RW (?)
-    #		- does mcmcsamp break for data that's not really grouped?
-    warning("mcmcsamp() may not work reliably yet -- check the traceplots!")
-    cat("starting", sims,"MCMC iterations for posterior intervals:\n")
-    mcmc <- mcmcsamp(object, n=sims, saveb=T)
-    cat("		... done.\n")
     
-    ci.MCMC<- function(base, terms, i, j, mcmc, level, addConst){
-      
-      indUnpen <- if(addConst){
-        c(attr(terms[[i]],"indConst")[[j]], attr(terms[[i]],"indUnpen")[[j]])
-      } else attr(terms[[i]],"indUnpen")[[j]]	
-      fhat <- base$X[[j]] %*% mcmc@fixef[indUnpen,] +
-        base$Z[[j]] %*% mcmc@ranef[attr(terms[[i]],"indPen")[[j]],]
-      ci <- HPDinterval(fhat, prob=level)
-      #probs <- c((1-level)/2, level + (1-level)/2)
-      #ci <- t(apply(fhat, 1, quantile, probs = probs, na.rm=T)
-      colnames(ci) <- c("lo", "hi")
-      return(ci)
-    }
-  }
   
   ci.RW <- function(fhat, base, terms, i, j, object, level, addConst){
     fctV <-
@@ -158,7 +169,7 @@ getF <- function (object, which, n=100, newdata=NULL, interval = c("NONE", "MCMC
           #FIXME: HACK: V is not invertible for var(ranef)=0, use var(ranef)=10^-9 instead 
           diag(V)[-(1:length(indUnpen))] <- diag(V)[-(1:length(indUnpen))] + 10^9
         }
-        return(lme4:::sigma(m)^2 * solve(V))
+        return(sigma(m)^2 * solve(V))
       }
     
     z <- qnorm(1-(1-level)/2)
@@ -240,7 +251,7 @@ getF <- function (object, which, n=100, newdata=NULL, interval = c("NONE", "MCMC
       base0 <- base
       #where are the random effects for the penalized spline functions:
       ##use the first because the spline will have more levels (grps*(p-d)) than the grouping factor (grps)
-      indZ <- lme4:::reinds(object@Gp)[[ attr(terms[[i]],"indGrp") [[1]] [1] ]]  
+      indZ <- reinds(object@Gp)[[ attr(terms[[i]],"indGrp") [[1]] [1] ]]  
       #how many penalized spline functions per level of by
       dimOneZ <- length(indZ)/length(lvls)
       useZ <- 1:dimOneZ
@@ -320,8 +331,7 @@ getF <- function (object, which, n=100, newdata=NULL, interval = c("NONE", "MCMC
       if(!eval(terms[[i]]$allPen)){ 
         ci <- switch(interval,
                      "NONE" = matrix(NA, nrow=nrow(base$X[[ansInd]]), ncol=0),
-                     "RW" = ci.RW(fhat, base, terms, i, j, object, level, addConst[i]),
-                     "MCMC" = ci.MCMC(base, terms, i, j, mcmc, level, addConst[i]))
+                     "RW" = ci.RW(fhat, base, terms, i, j, object, level, addConst[i]))
       } else {
         #TODO: implement CIs for fits with allPen = T
         if(interval!="NONE" && j==1) warning("CIs for fits with allPen = T not yet implemented.")

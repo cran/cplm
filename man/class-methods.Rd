@@ -24,12 +24,22 @@
 \alias{predict,cpglm-method}
 
 \alias{cpglmm-class}
+\alias{coef,cpglmm-method}
+\alias{fixef,cpglmm-method}
+\alias{ranef,cpglmm-method}
+\alias{logLik,cpglmm-method}
+\alias{anova,cpglmm-method}
+\alias{fitted,cpglmm-method}
+\alias{residuals,cpglmm-method}
+\alias{resid,cpglmm-method}
 \alias{print,cpglmm-method}
 \alias{summary,cpglmm-method}
 \alias{show,cpglmm-method}
 \alias{VarCorr,cpglmm-method}
 \alias{vcov,cpglmm-method}
 \alias{predict,cpglmm-method}
+
+
 
 \alias{summary.cpglmm-class}
 
@@ -56,6 +66,9 @@
 \alias{gini-class}
 \alias{plot,gini,missing-method}
 \alias{show,gini-method}
+
+\alias{VarCorr}
+\alias{VarCorr-methods}
 
 \title{Classes and Methods for a Compound Poisson Linear Model Object}
 
@@ -111,7 +124,7 @@ Documented here are the \code{"cplm"} class and its derived classes \code{"cpglm
     \item{\code{na.action}:}{method of handling \code{NA}'s, class \code{"NullFunc"}.}
 }    
     
-  The  \code{"cpglmm"} class extends \code{"\linkS4class{mer}"} and \code{"cplm"} directly, and has the following additional slots (see \code{"\linkS4class{mer}"} for details of the slots not documented here):
+  The  \code{"cpglmm"} class extends \code{"cplm"} and the old version of \code{"mer"} class from \code{lme4} directly, and has the following additional slots:
   \describe{
     \item{\code{p}:}{estimated value of the index parameter, class \code{"numeric"}  }
     \item{\code{phi}:}{estimated value of the dispersion parameter, class \code{"numeric"} }
@@ -119,7 +132,129 @@ Documented here are the \code{"cplm"} class and its derived classes \code{"cpglm
     \item{\code{vcov}:}{estimated variance-covariance matrix, class \code{"matrix"}}
     \item{\code{smooths}:}{a list of smooth terms}
     }
+The slots it used from the old \code{"mer"} class has the following slots (copied from \code{lme4_0.999999-2}):
+  \describe{
 
+    \item{\code{env}:}{An environment (class \code{"environment"})
+      created for the evaluation of the nonlinear model function. }
+
+    \item{\code{nlmodel}:}{The nonlinear model function as an object of
+      class \code{"call"}. }
+
+    \item{\code{frame}:}{The model frame (class \code{"data.frame"}).}
+
+    \item{\code{call}:}{The matched call to the function that
+      created the object. (class \code{"call"}).}
+
+    \item{\code{flist}:}{The list of grouping factors for the random
+      effects.}
+
+    \item{\code{X}:}{Model matrix for the fixed effects. }
+
+    \item{\code{Zt}:}{The transpose of model matrix for the random
+      effects, stored as a compressed column-oriented sparse matrix (class
+      \code{"\link[Matrix:dgCMatrix-class]{dgCMatrix}"}).}
+
+    \item{\code{pWt}:}{Numeric prior weights vector. This may be of length
+      zero (0), indicating unit prior weights.}
+
+    \item{\code{offset}:}{Numeric offset vector. This may be of length
+      zero (0), indicating no offset.}
+
+    \item{\code{y}:}{The response vector (class \code{"numeric"}).}
+
+    \item{\code{Gp}:}{Integer vector of group pointers within the random
+      effects vector.  The elements of \code{Gp} are 0-based indices of
+      the first element from each random-effects term.  Thus the first
+      element is always 0.  The last element is the total length of the
+      random effects vector.}
+
+    \item{\code{dims}:}{A named integer vector of dimensions.  Some of
+      the dimensions are \eqn{n}, the number of observations, \eqn{p}, the
+      number of fixed effects, \eqn{q}, the total number of random
+      effects, \eqn{s}, the number of parameters in the nonlinear model
+      function and \eqn{nt}, the number of random-effects terms in the
+      model.}
+
+    \item{\code{ST}:}{A list of S and T factors in the TSST' Cholesky
+      factorization of the relative variance matrices of the random
+      effects associated with each random-effects term.  The unit lower
+      triangular matrix, \eqn{T}, and the diagonal matrix, \eqn{S}, for
+      each term are stored as a single matrix with diagonal elements
+      from \eqn{S} and off-diagonal elements from \eqn{T}.}
+
+    \item{\code{V}:}{Numeric gradient matrix (class \code{"matrix"}) of
+      the nonlinear model function.}
+
+    \item{\code{A}:}{Scaled sparse model matrix (class
+      \code{"\link[Matrix:dgCMatrix-class]{dgCMatrix}"}) for
+      the the unit, orthogonal random effects, \eqn{U}.}
+
+    \item{\code{Cm}:}{Reduced, weighted sparse model matrix (class
+      \code{"\link[Matrix:dgCMatrix-class]{dgCMatrix}"}) for the
+      unit, orthogonal random effects, U.  .}
+
+    \item{\code{Cx}:}{The \code{"x"} slot in the weighted sparse model
+      matrix (class \code{"\link[Matrix:dgCMatrix-class]{dgCMatrix}"})
+      for the unit, orthogonal random effects, \eqn{U}, in generalized
+      linear mixed models.  For these models the matrices \eqn{A} and
+      \eqn{C} have the same sparsity pattern and only the \code{"x"}
+      slot of \eqn{C} needs to be stored.}
+
+    \item{\code{L}:}{The sparse lower Cholesky factor of \eqn{P(AA'+I)P'}
+      (class \code{"\link[Matrix:CHMfactor-class]{dCHMfactor}"}) where \eqn{P}
+      is the fill-reducing permutation calculated from the pattern of
+      nonzeros in \eqn{A}.}
+
+    \item{\code{deviance}:}{Named numeric vector containing the deviance
+      corresponding to the maximum likelihood (the \code{"ML"} element)
+      and \code{"REML"} criteria and various components. The
+      \code{"ldL2"} element is twice the logarithm of the determinant of
+      the Cholesky factor in the \code{L} slot. The \code{"usqr"}
+      component is the value of the random-effects quadratic form.}
+
+    \item{\code{fixef}:}{Numeric vector of fixed effects.}
+
+    \item{\code{ranef}:}{Numeric vector of random effects on the
+      original scale.}
+
+    \item{\code{u}:}{Numeric vector of orthogonal, constant variance,
+      random effects.}
+
+    \item{\code{eta}:}{The linear predictor at the current values of the
+      parameters and the random effects.}
+
+    \item{\code{mu}:}{The means of the responses at the current parameter
+      values.}
+
+    \item{\code{muEta}:}{The diagonal of the Jacobian of \eqn{\mu}{mu}
+      by \eqn{\eta}{eta}.  Has length zero (0) except for generalized
+      mixed models.}
+
+    \item{\code{var}:}{The diagonal of the conditional variance of
+      \eqn{Y} given the random effects, up to prior weights.  In
+      generalized mixed models this is the value of the variance
+      function for the \code{\link{glm}} family.}
+
+    \item{\code{resid}:}{The residuals, \eqn{y - \mu}{y-mu}, weighted by
+      the \code{sqrtrWt} slot (when its length is \eqn{>0}).}
+
+    \item{\code{sqrtXWt}:}{The square root of the weights applied to the
+      model matrices \eqn{X} and \eqn{Z}. This may be of length zero
+      (0), indicating unit weights.}
+
+    \item{\code{sqrtrWt}:}{The square root of the weights applied to the
+      residuals to obtain the weighted residual sum of squares. This may
+      be of length zero (0), indicating unit weights.}
+
+    \item{\code{RZX}:}{The dense solution (class \code{"matrix"}) to
+      \eqn{L RZX = ST'Z'X = AX}.}
+
+    \item{\code{RX}:}{The upper Cholesky factor (class \code{"matrix"})
+      of the downdated \eqn{X'X}.}
+
+  }
+  
   The \code{"summary.cpglmm"} class \emph{contains} the \code{"cpglmm"}
   class and has the following additional slots:
   \describe{
@@ -178,10 +313,9 @@ Documented here are the \code{"cplm"} class and its derived classes \code{"cpglm
 
 Class \code{"cpglm"} extends class \code{"\linkS4class{cplm}"}, directly.
 
-Class \code{"cpglmm"} extends class \code{"\linkS4class{cplm}"} and \code{"\linkS4class{mer}"}, directly;
+Class \code{"cpglmm"} extends class \code{"\linkS4class{cplm}"}, directly;
 
 Class \code{"summary.cpglmm"}  extends class \code{"\linkS4class{cpglmm}"}, directly; 
-class \code{"\linkS4class{mer}"}, by class \code{"\linkS4class{cpglmm}"}, distance 2;
 class \code{"\linkS4class{cplm}"}, by class \code{"\linkS4class{cpglmm}"}, distance 2.
 
 Class \code{"bcplm"} extends class \code{"\linkS4class{cplm}"}, directly.
@@ -220,7 +354,7 @@ Class \code{"zcpglm"} extends class \code{"\linkS4class{cplm}"}, directly.
    }
    
    
-  For the class \code{"cpglmm"}, most methods defined for \code{"\linkS4class{mer}"} can be applied directly. The following are written specifically for \code{"cpglmm"}: 
+   The following are written for \code{"cpglmm"}: 
   \describe{
     \item{print}{\code{signature(x = "cpglmm")}:  print the object }
     \item{summary}{\code{signature(object = "cpglmm")}: summary results}
@@ -256,7 +390,7 @@ The following methods are defined for the \code{"gini"} class:
 
 \author{ Wayne  Zhang \email{actuary_zhang@hotmail.com} }
 \seealso{
-  See also \code{\link{cpglm}}, \code{\link{cpglmm}}, \code{\link{bcplm}}, \code{\link{zcpglm}}, \code{\link[stats]{glm}} and \code{\link[lme4]{mer-class}}.   
+  See also \code{\link{cpglm}}, \code{\link{cpglmm}}, \code{\link{bcplm}}, \code{\link{zcpglm}}, \code{\link[stats]{glm}}.   
 }
 
 \keyword{classes}

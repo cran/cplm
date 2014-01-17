@@ -167,6 +167,17 @@ static R_INLINE double *SLOT_REAL_NULL(SEXP obj, char *str)
 /** Return the double pointer to the ghx slot */
 #define GHX_SLOT(x) SLOT_REAL_NULL(x, "ghx")
 
+/** Return the double pointer to the RX slot */
+#define RX_SLOT(x) SLOT_REAL_NULL(x, "RX")
+
+/** Return the double pointer to the RZX slot */
+#define RZX_SLOT(x) SLOT_REAL_NULL(x, "RZX")
+
+/** Allocate (alloca) a cholmod_sparse struct, populate it with values
+ * from the Cm slot and return the pointer. */
+#define Cm_SLOT(x) AS_CHM_SP(GET_SLOT(x, install("Cm")))
+
+
 /************************************************/
 /*       Additional slots used in bcplm         */  
 /************************************************/

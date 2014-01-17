@@ -23,7 +23,7 @@ bcplm <- function(formula, link = "log", data, inits = NULL,
   is.cpglmm <- 0
   
   # this is for cpglmm 
-  if (length(lme4:::findbars(formula)) || n.f){
+  if (length(findbars(formula)) || n.f){
     is.cpglmm <- 1
     # create model frame and get factor list
     if (n.f) {
@@ -35,10 +35,10 @@ bcplm <- function(formula, link = "log", data, inits = NULL,
       fr <- setup$m$fr 
       FL <- setup$m$FL
     } else {  
-      fr <- lme4:::lmerFrames(call, formula, contrasts)
-      FL <- lme4:::lmerFactorList(formula, fr, 0L, 0L)      
+      fr <- lmerFrames(call, formula, contrasts)
+      FL <- lmerFactorList(formula, fr, 0L, 0L)      
     } 
-    dm <- lme4:::mkZt(FL, NULL)
+    dm <- mkZt(FL, NULL)
   } else {   
     # this is for glm
     fr <- cpglm.mf(call, contrasts)    
