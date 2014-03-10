@@ -137,7 +137,11 @@ cpglmm <- function(formula, link = "log", data, weights, offset,
   # add smooth terms 
   if (n.f) {
     ans@smooths <- indsF(ans, setup$fct, setup$fctterm)
-    vars <- unname(sapply(ans@smooths, function(tt) as.character(tt[["x"]])))
+    vars <- unname(sapply(ans@smooths, function(tt) {
+      pos <- grep("^x\\d?$", names(tt), perl = TRUE)
+      sapply(pos, function(x) as.character(tt[[x]]))
+      }))
+    vars <- as.character(vars)
     ans@frame <- data.frame(ans@frame, base::subset(data, select = vars)) 
   }
   ans

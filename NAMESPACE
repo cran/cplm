@@ -47,3 +47,4 @@ exportMethods(summary, show,  "$", "[[", "[", names, coef, vcov,
               residuals, resid, fitted, fixef, ranef, logLik, anova, 
 		  AIC, deviance, terms, formula, model.matrix, plot,
 		  VarCorr, predict)
+S3method(model.frame, cplm)

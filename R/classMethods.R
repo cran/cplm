@@ -261,6 +261,10 @@ setMethod("vcov",
   function(object, ...) object@vcov
 )
 
+model.frame.cplm <- function (formula, ...) 
+{
+  formula@model.frame  
+}
 ################################################
 # methods defined for cpglm 
 ################################################
