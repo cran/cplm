@@ -93,7 +93,6 @@ The simulated values of all model parameters are stored in the  \code{sims.list}
 
 \references{
 \cite{ Zhang, Y (2013). Likelihood-based and Bayesian Methods for Tweedie Compound Poisson Linear Mixed Models, \emph{Statistics and Computing}, 23, 743-757.
-\url{https://cplm.googlecode.com/files/MixedTweedie.pdf}
 }
 }
 

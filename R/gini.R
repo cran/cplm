@@ -129,6 +129,8 @@ setMethod("show",
 setMethod("plot", 
   signature(x = "gini", y = "missing"),
   function(x, y, overlay = TRUE, ...) {
+    # -Wall: no binding or global variables in R check 
+    Base <- Premium <- Score <- Loss <- NULL
     lrz <- lapply(x@lorenz, as.data.frame)
     pd <- lapply(1:length(lrz), function(t){
             lrz[[t]]$Base <- rep(names(lrz)[t], nrow(lrz[[t]]))

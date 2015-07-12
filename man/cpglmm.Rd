@@ -59,7 +59,6 @@ In addition, similar to the package \code{amer} (already retired from CRAN), we 
 
 \references{
 \cite{ Zhang, Y (2013). Likelihood-based and Bayesian Methods for Tweedie Compound Poisson Linear Mixed Models, \emph{Statistics and Computing}, 23, 743-757.
-\url{https://cplm.googlecode.com/files/MixedTweedie.pdf}
 }
 }
 

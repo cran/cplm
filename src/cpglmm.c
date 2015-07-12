@@ -261,15 +261,18 @@ static double cp_update_L(SEXP x)
     for (int j = 0; j < n; j++)
         for (int p = ap[j]; p < ap[j + 1]; p++)
             cx[p] = ax[p] * sXwt[j] ;
+
     A->x = (void*)cx;
     
     // compute the cholesky factor of AA'+I with permutation
     if (!M_cholmod_factorize_p(A, one, (int*)NULL, 0, L, &c))
 	error(_("cholmod_factorize_p failed: status %d, minor %d from ncol %d"),
 	      c.status, L->minor, L->n);
+
     
     d[ldL2_POS] = M_chm_factor_ldetL2(L);
     d[pwrss_POS] = d[usqr_POS] + d[wrss_POS];
+    
     return d[pwrss_POS];
 }
 
@@ -404,7 +407,7 @@ static int cp_update_u(SEXP x)
 	}
 	if (step <= CM_SMIN || i > CM_MAXITER) return 0;
     }
-    
+
     Free(tmp); Free(tmp1); Free(uold);
     return i;
 }

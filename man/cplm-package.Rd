@@ -33,7 +33,7 @@ a Gini Index. \emph{Journal of the American Statistical Association}, 495, 1085 
 }
 
 \cite{ Zhang, Y (2013). Likelihood-based and Bayesian Methods for Tweedie Compound Poisson Linear Mixed Models, \emph{Statistics and Computing}, 23, 743-757.
-\url{https://cplm.googlecode.com/files/MixedTweedie.pdf}}
+}
 }
 
 

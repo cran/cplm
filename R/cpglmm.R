@@ -77,7 +77,10 @@ cpglmm <- function(formula, link = "log", data, weights, offset,
              Zt = dm$Zt, X = fr$X, y = as.numeric(fr$Y), 
              pWt = fr$wts, offset = fr$off,
              Gp = unname(dm$Gp), dims = dm$dd, 
-             ST = dm$ST, A = dm$A, Cm = dm$Cm, Cx = (dm$A)@x, L = dm$L, 
+             ST = dm$ST, A = dm$A, Cm = dm$Cm, L = dm$L, 
+             Cx = rep(1.0, length((dm$A)@x)),  
+             # was Cx = dm$A)@x which broke in R3.0.x. 
+             # Referecen to the same value. Need duplicate in C level
              deviance = dm$dev, fixef = inits$beta, ranef = numeric(q), 
              u = numeric(q), eta = numeric(n), 
              mu = numeric(n), resid = numeric(n), 
@@ -88,7 +91,6 @@ cpglmm <- function(formula, link = "log", data, weights, offset,
              p = inits$p, phi = inits$phi, link.power = as.double(link.power), 
              bound.p = ctr$bound.p, formula = formula, contrasts = contrasts,
              model.frame = fr$mf, inits = inits, vcov = matrix(0, d, d), smooths = list())
-  
   # return cpglmm object if model fitting is turned off
   if (!doFit)  return(ans)
   

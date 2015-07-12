@@ -1,4 +1,13 @@
 ================
+Version 0.7-3
+================
+
+CHANGES:
+
+   o update to be compatible with R 3.x (Prior versions failed)
+
+
+================
 Version 0.7-2
 ================
 
