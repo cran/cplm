@@ -66,16 +66,22 @@ check.inits.cpglmm <- function(inits, n.beta, n.term){
 }
 
 # check initial values in bcplm
-check.inits.bcplm <- function(inits, n.beta, n.term, n.chains){
-  
-  if (any(is.na(match(c("beta", "phi", "p", "u", "Sigma"), names(inits)))))
+check.inits.bcplm <- function(inits, n.beta, n.term, n.chains, is.cpglmm){
   if (length(inits) != n.chains)
-    stop(gettextf("'inits' should be of length %d", n.chains))
+    stop(gettextf("'inits' should be of length %d", n.chains))  
   lapply(inits, function(x) {
-    check.inits.cpglmm(x, n.beta, n.term)
-    if (!("u" %in% names(x)))
-      stop("the 'u' component in 'inits' is missing")
-    })
+    if (any(is.na(match(c("beta", "phi", "p"), names(x)))))
+      stop("elements of 'inits' should contain 'beta', 'phi' and 'p'")
+    if (is.cpglmm && any(is.na(match(c("u", "Sigma"), names(inits)))))
+      stop("elements of 'inits' should contain 'u', and 'Sigma'")  
+    if (!is.cpglmm){
+      check.inits.cpglm(x, n.beta)
+    } else {
+      check.inits.cpglmm(x, n.beta, n.term)
+      if (!("u" %in% names(x)))
+        stop("the 'u' component in 'inits' is missing")
+    }
+  })
 }  
 
 

@@ -41,7 +41,7 @@ a Gini Index. \emph{Journal of the American Statistical Association}, 495, 1085 
 }
 }
 \author{
-Wayne (Yanwei) Zhang \email{actuary_zhang@hotmail.com}
+Yanwei (Wayne) Zhang \email{actuary_zhang@hotmail.com}
 }
 
 \seealso{

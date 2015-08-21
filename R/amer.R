@@ -1,7 +1,8 @@
 #######################################################
-##           Functions from amer                     ##
+# These functions are copied from the retired R
+# package 'amer', written by Fabian Scheipl (fabian.scheipl@googlemail.com)
 #######################################################
-
+# 
 # I changed the original expand.call in amer to remove the use of .Internal
 expand.call <-
   function(call = sys.call(sys.parent(1)))

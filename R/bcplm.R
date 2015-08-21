@@ -87,7 +87,7 @@ bcplm <- function(formula, link = "log", data, inits = NULL,
     mh.sd[1:n.beta] <- sqrt(diag(tmp$vbeta))
   } else{
     # check initial values
-    check.inits.bcplm(inits, n.beta, dims["n.term"], n.chains)  
+    check.inits.bcplm(inits, n.beta, dims["n.term"], n.chains, is.cpglmm)  
     inits <- lapply(inits, function(x) 
                 c(x$beta, x$phi, x$p, x$u, unlist(lapply(x$Sigma, as.numeric))))
   }

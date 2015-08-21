@@ -23,7 +23,7 @@ More information is available on the hosting web site of the project \url{http:/
 }
 
 \author{
-Wayne Zhang <actuary_zhang@hotmail.com>
+Yanwei (Wayne) Zhang <actuary_zhang@hotmail.com>
 }
 \references{
 \cite{Dunn, P.K. and Smyth, G.K. (2005). Series evaluation of Tweedie exponential dispersion models densities. \emph{Statistics and Computing}, 15, 267-280.}

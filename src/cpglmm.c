@@ -3,6 +3,9 @@
 /*    Linear Mixed models using the Laplace approximation   */
 /*    and the adaptive Gaussian-Hermite quadrature method.  */
 /*    This is based on the code from the lme4 package.      */
+/*             Orignal authors (lme4.0):                    */
+/*         Bates D, Maechler M, Bolker B and Walker S       */
+/*                                                          */
 /*              Author:  Wayne Zhang                        */
 /*            actuary_zhang@hotmail.com                     */
 /************************************************************/
@@ -1022,6 +1025,12 @@ SEXP cpglmm_ghq(SEXP np)
 }
 
 
+
+/************************************************************
+*  The following functions are simply copied from
+*  lme4.0 since it is replaced by a new implementation
+*  that is no longer compatible with cplm
+************************************************************/
 
 /**
  * Evaluate starting estimates for the elements of ST

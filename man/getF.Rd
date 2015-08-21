@@ -32,5 +32,7 @@ Defaults to 1.}
 \item{legendPos}{a (vector of) keyword(s) where to put labels of by-variables (see \code{\link[graphics]{legend}}). "none" if you don't want a legend.}
 \item{...}{arguments passed on to the low-level plot functions (\code{plot}, \code{matlines}), \code{legend}, and \code{title}}
 }
-
+\author{
+Fabian Scheipl \email{fabian.scheipl@googlemail.com}
+}
 \seealso{See the vignette for examples}

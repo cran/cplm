@@ -40,5 +40,8 @@ if FALSE, make design for separate curves for each by-level: separate smoothing 
 \item{scaledknots}{boolean:	are knot locations given for the rescaled x-values?}
 \item{spline.degree}{integer: degree of B-splines (defaults to cubic)}
 \item{diff.ord}{integer: order of the difference penalty on the un-reparamerized spline coefficients. Defaults to 2, that is, penalized deviations from linearity.}
+}
 
+\author{
+Fabian Scheipl \email{fabian.scheipl@googlemail.com}
 }

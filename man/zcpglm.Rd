@@ -39,7 +39,7 @@ More details of this model are available in the package vignettes.
 
 
 \author{
-Wayne (Yanwei) Zhang \email{actuary_zhang@hotmail.com}
+Yanwei (Wayne) Zhang \email{actuary_zhang@hotmail.com}
 }
 
 \seealso{

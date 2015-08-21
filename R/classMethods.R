@@ -60,6 +60,8 @@ setClass("mer",
            ghw = "numeric"))
 
 
+## -------------------- End lmer-related Classes --------------------------------
+
 # class defining slots common to all derived classes 
 setClass("cplm", 
   representation(
@@ -404,7 +406,13 @@ setMethod("predict", signature(object = "cpglm"),
             offset <- offset + eval(object$call$offset, newdata)
     }
    beta <- object$coefficients
-   predictor <- X%*% beta
+   na.ps <- which(is.na(beta))
+   if (length(na.ps)) {
+    predictor <- X[, -na.ps, drop = FALSE] %*% beta[-na.ps]
+    warning("prediction from a rank-deficient fit may be misleading")
+   } else {
+    predictor <- X%*% beta
+   }
     if (!is.null(offset)) 
         predictor <- predictor + offset
     mu <- tweedie(link.power = object@link.power)$linkinv(predictor)
@@ -628,7 +636,7 @@ getZt <- function(formula, oldmf, newmf){
 }         
 
 setMethod("predict", signature(object = "cpglmm"),
-    function(object,  newdata, type = c("link","response"), 
+    function(object,  newdata, type = c("response", "link"), 
           na.action = na.pass, ...) {
     tt <- attr(object@model.frame,"terms")
     if (missing(newdata) || is.null(newdata)) {

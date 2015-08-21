@@ -13,7 +13,7 @@ importFrom(statmod, tweedie)
 importFrom(tweedie, dtweedie.series, dtweedie, tweedie.dev)
 importMethodsFrom(methods, show)
 importFrom(nlme, fixef, ranef, VarCorr)
-importFrom("stats4", AIC, BIC, logLik)# so S4 methods are used!
+importFrom("stats4", AIC, BIC, logLik, vcov)# so S4 methods are used!
 importFrom("stats",
            anova,
            coef,
@@ -25,8 +25,7 @@ importFrom("stats",
            model.matrix,
            predict,
            residuals, resid,  
-           terms,
-           vcov
+           terms
            )
 # R3.3
 importFrom("graphics", "legend", "matlines", "par", "title")

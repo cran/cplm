@@ -67,7 +67,7 @@ The \code{control} argument is a list that can supply various controlling elemen
 }
 
 \author{
-Wayne (Yanwei) Zhang \email{actuary_zhang@hotmail.com}
+Yanwei (Wayne) Zhang \email{actuary_zhang@hotmail.com}
 }
 
 \seealso{

@@ -43,3 +43,9 @@ vector of knot locations for the first covariate in the coordinate
 vector of knot locations for the second covariate in the coordinate
 }
 }
+
+\author{
+Fabian Scheipl \email{fabian.scheipl@googlemail.com}
+}
+
+

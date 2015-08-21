@@ -26,7 +26,7 @@ bcplm(formula, link = "log", data, inits = NULL,
 }
   \item{link}{a specification for the model link function. This can be either a literal character string or a numeric number. If it is a character string, it must be one of "log", "identity", "sqrt" or "inverse". If it is numeric, it is the same as the \code{link.power} argument in the \code{\link[statmod]{tweedie}} function. The default is \code{link = "log"}.
 }
- \item{inits}{a list of initial values to be used for each chain. It must be of length \code{n.chains}. Each element is a named list with the following components: 'beta' (fixed effects), 'phi' (dispersion), 'p' (index parameter) and 'Sigma' (variance components) if random effects exist.  If the formula indicates a mixed model, then 'Sigma' must be a list of the same format as the \code{ST} slot in \code{cpglmm}. If not supplied, the function will generate initial values automatically.
+ \item{inits}{a list of initial values to be used for each chain. It must be of length \code{n.chains}. Each element is a named list with the following components: 'beta' (fixed effects), 'phi' (dispersion), and 'p' (index parameter). If the formula indicates a mixed model, it must also contain two additional members 'u' (random effects) and 'Sigma' (variance components). 'Sigma' must be a list of the same format as the \code{ST} slot in \code{cpglmm}. If not supplied, the function will generate initial values automatically.
 }
 
   \item{data, subset, weights, na.action, offset, contrasts}{further model specification arguments as in \code{\link{cpglm}}; see there for details.}
@@ -97,7 +97,7 @@ The simulated values of all model parameters are stored in the  \code{sims.list}
 }
 
 \author{
-Wayne (Yanwei) Zhang \email{actuary_zhang@hotmail.com}
+Yanwei (Wayne) Zhang \email{actuary_zhang@hotmail.com}
 }
 
 \seealso{

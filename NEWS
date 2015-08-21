@@ -1,4 +1,18 @@
 ================
+Version 0.7-4
+================
+
+CHANGES:
+
+   o 'predict' method failed when 'cpglm' is rank deficient. Fixed this. 
+	Now returns the prediction but with a warning. 
+   o 'predict' method for 'cpglmm' defaults to type = 'response'.
+   o Fix issues when specifying initial values for 'bcplm' 
+   o Add author info for the 'amer' functions
+   o Update vignettes
+ 
+
+================
 Version 0.7-3
 ================
 
