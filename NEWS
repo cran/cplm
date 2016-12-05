@@ -1,4 +1,13 @@
 ================
+Version 0.7-5
+================
+CHANGES:
+
+   o ‘gini’ now can handle a single score
+   o Fixed bug when supplying initial values
+
+
+================
 Version 0.7-4
 ================
 
