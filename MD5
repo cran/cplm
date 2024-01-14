@@ -1,4 +1,4 @@
-d3f0e2585797c3fb04c92c7aab2ab6b4 *DESCRIPTION
+4c62af8bd50b8c0ee587dc58b2164eb6 *DESCRIPTION
 a3ddef5f42623e2a28a9544f7374bb70 *NAMESPACE
 27f387830e957d8b744766fe4170deef *NEWS
 fe64f06d7b7745d6934138eb84c5a5bf *R/amer.R
@@ -10,13 +10,15 @@ ed330b809f8f4cf89c0fe006d4af6b4e *R/gini.R
 8e7ed57ecd3f384b17b16779791189ff *R/lme4_lmer.R
 b0c44540b669c1ba179a113c776b5b7d *R/spline.R
 a9122aff15dfe5c418df57c301943d22 *R/utilities.R
-0427c9ba5e937128c55a83e82d874a0b *data/AutoClaim.RData
-25261c04f08a759185b150e200fc76f3 *data/ClaimTriangle.RData
-ae546137f4b6df91c7bada1f7d858a70 *data/FineRoot.RData
+ec7c70eb3816fe2820d8b753bb9f99a7 *build/vignette.rds
+d5b1166aee603940758236e208b30e17 *data/AutoClaim.RData
+ccf99a735bdb77ab5b2592486d8a0ea0 *data/ClaimTriangle.RData
+b0229a1c1d2d876bf8c513add84dafe1 *data/FineRoot.RData
 06f317d6ab594772b2e4a27557629926 *inst/CITATION
 941cfe91fd8bbfa8071dfc86731ae41a *inst/doc/TweediePaper.pdf
+c696ca2e87c22306184055d04d450184 *inst/doc/cplm.R
 22bc40a87aa9079b1a4742c60a9719bc *inst/doc/cplm.Rnw
-904caf44732d73b6f681eb3195ee63f3 *inst/doc/cplm.pdf
+e78daa20118352997f953efb6b866172 *inst/doc/cplm.pdf
 878af1b74c504ec06b8bfc433ddf4575 *man/bcplm.Rd
 9f956705622fdfb77999f21fd1d32c13 *man/class-methods.Rd
 91ddf394d7ada9e431d352be38a3995b *man/cpglm.Rd
@@ -31,7 +33,7 @@ ae546137f4b6df91c7bada1f7d858a70 *data/FineRoot.RData
 32f8e8fb712d096833380f383c31a448 *src/bcplm.c
 5212580d81a85d45f98a12a4d60b4207 *src/bcplm.h
 fabc5388581659f8174a4aaddb6e4b5b *src/common.h
-74f64f8d510e3783a4ec744403c19adc *src/cpglmm.c
+8dbe77907693e6d6f3581e159b27e33f *src/cpglmm.c
 bde3f0f0c683f41d3832e9d5d0ee799b *src/cpglmm.h
 f4c1b4efaf32fb002891918859e34e95 *src/init.c
 9432e315d7d3a304f2023c156c29db93 *src/local_stubs.c
