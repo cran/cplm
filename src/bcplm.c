@@ -638,8 +638,8 @@ static void tune_mcmc(SEXP da){
   int nmh = dm[nmh_POS],
     etn = ceil(dm[tnit_POS] * 1.0 / dm[ntn_POS]) ;  // # iters per tuning loop;
   double *mh_sd = MHSD_SLOT(da), *acc = ACC_SLOT(da), 
-    *sims = Calloc(etn * dm[nA_POS], double);
-  int nmark = 0, *mark = Calloc(nmh, int);
+    *sims = R_Calloc(etn * dm[nA_POS], double);
+  int nmark = 0, *mark = R_Calloc(nmh, int);
   AZERO(mark, nmh);
 
   /* run MCMC and tune parameters */
@@ -657,8 +657,8 @@ static void tune_mcmc(SEXP da){
     print_acc(1, nmh, acc, 1);
     Rprintf("-----------------------------------------\n");
   }
-  Free(sims);
-  Free(mark);
+  R_Free(sims);
+  R_Free(mark);
 }
 
 /**

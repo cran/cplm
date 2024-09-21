@@ -358,8 +358,8 @@ static int cp_update_u(SEXP x)
 	*res = RESID_SLOT(x), *u = U_SLOT(x),
 	cfac = ((double)n) / ((double)q),
 	crit, pwrss, pwrss_old, step;
-    double *tmp = Calloc(q, double), *tmp1 = Calloc(q, double),
-	*uold = Calloc(q, double), one[] = {1,0}, zero[] = {0,0};
+    double *tmp = R_Calloc(q, double), *tmp1 = R_Calloc(q, double),
+	*uold = R_Calloc(q, double), one[] = {1,0}, zero[] = {0,0};
     CHM_FR L = L_SLOT(x);
     CHM_DN cres = N_AS_CHM_DN(res, n, 1),
 	ctmp = N_AS_CHM_DN(tmp, q, 1), sol;
@@ -411,7 +411,7 @@ static int cp_update_u(SEXP x)
 	if (step <= CM_SMIN || i > CM_MAXITER) return 0;
     }
 
-    Free(tmp); Free(tmp1); Free(uold);
+    R_Free(tmp); R_Free(tmp1); R_Free(uold);
     return i;
 }
 
@@ -511,14 +511,14 @@ static double cp_update_dev(SEXP x, double *parm)
       for (int i = 0; i < nre; i++) nt *= nAGQ;
 	
       double *ghw = GHW_SLOT(x), *ghx = GHX_SLOT(x),          
-	*uold = Memcpy(Calloc(q, double), u, q), 
-	*z = Calloc(q, double),              /* current abscissas */
-	*ans_tmp = Calloc(n, double),        /* log data density */
-	*ans = Calloc(nl, double);           /* loglikelihood by group */
+	*uold = Memcpy(R_Calloc(q, double), u, q), 
+	*z = R_Calloc(q, double),              /* current abscissas */
+	*ans_tmp = R_Calloc(n, double),        /* log data density */
+	*ans = R_Calloc(nl, double);           /* loglikelihood by group */
       double mm, W = 0.0;                    /* values needed in AGQ evaluation */
       double sigma = sqrt(phi[0]);
-      double **tmp = Calloc(nl, double*);    /* matrix of exponents as in log(exp(x1) + ...) */
-      for (int i = 0; i < nl; i++)  tmp[i] = Calloc(nt, double);
+      double **tmp = R_Calloc(nl, double*);    /* matrix of exponents as in log(exp(x1) + ...) */
+      for (int i = 0; i < nl; i++)  tmp[i] = R_Calloc(nt, double);
       R_CheckStack();
       AZERO(pointer, nre);
 
@@ -578,12 +578,12 @@ static double cp_update_dev(SEXP x, double *parm)
       /* restore values */
       Memcpy(u, uold, q);
       cp_update_mu(x);
-      Free(uold);
-      Free(z);
-      Free(ans_tmp); 
-      Free(ans);
-      for (int i = 0; i < nl; i++) Free(tmp[i]);
-      Free(tmp);
+      R_Free(uold);
+      R_Free(z);
+      R_Free(ans_tmp); 
+      R_Free(ans);
+      for (int i = 0; i < nl; i++) R_Free(tmp[i]);
+      R_Free(tmp);
       return d[ML_POS] ;
     }
 }
@@ -669,7 +669,7 @@ P_sdmult(double *dest, const int *perm, const CHM_SP A,
 	 const double *X, int nc)
 {
     int *ai = (int*)(A->i), *ap = (int*)(A->p), m = A->nrow, n = A->ncol;
-    double *ax = (double*)(A->x), *tmp = Calloc(m, double);
+    double *ax = (double*)(A->x), *tmp = R_Calloc(m, double);
     R_CheckStack();
 
     for (int k = 0; k < nc; k++) {
@@ -680,7 +680,7 @@ P_sdmult(double *dest, const int *perm, const CHM_SP A,
 	}
 	apply_perm(dest + k * m, tmp, perm, m);
     }
-    Free(tmp);
+    R_Free(tmp);
 }
 
 
@@ -706,7 +706,7 @@ static double update_RX(SEXP x)
     R_CheckStack();
 
     if (sXwt) {			/* Create W^{1/2}GHX in WX */
-	WX = Calloc(n * p, double);
+	WX = R_Calloc(n * p, double);
 
 	AZERO(WX, n * p);
 	for (int j = 0; j < p; j++)
@@ -737,7 +737,7 @@ static double update_RX(SEXP x)
     d[ldRX2_POS] = 0;
     for (int j = 0; j < p; j++) d[ldRX2_POS] += 2 * log(RX[j * (p + 1)]);
 
-    if (WX) Free(WX);
+    if (WX) R_Free(WX);
     return d[ML_POS];
 }
 
@@ -759,7 +759,7 @@ static void internal_ghq(int N, double *x, double *w)
     double Z = 0, HF = 0, HD = 0;
     double Z0, F0, F1, P, FD, Q, WP, GD, R, R1, R2;
     double HN = 1/(double)N;
-    double *X = Calloc(N + 1, double), *W = Calloc(N + 1, double);
+    double *X = R_Calloc(N + 1, double), *W = R_Calloc(N + 1, double);
 
     for(NR = 1; NR <= N / 2; NR++){
 	if(NR == 1)
@@ -817,8 +817,8 @@ static void internal_ghq(int N, double *x, double *w)
     Memcpy(x, X + 1, N);
     Memcpy(w, W + 1, N);
 
-    if(X) Free(X);
-    if(W) Free(W);
+    if(X) R_Free(X);
+    if(W) R_Free(W);
 }
 
 
@@ -1051,7 +1051,7 @@ SEXP mer_ST_initialize(SEXP ST, SEXP Gpp, SEXP Zt)
 	*zi = INTEGER(R_do_slot(Zt, install("i"))), nt = LENGTH(ST);
     int *nc = Alloca(nt, int), *nlev = Alloca(nt, int),
 	nnz = INTEGER(R_do_slot(Zt, install("p")))[Zdims[1]];
-    double *rowsqr = Calloc(Zdims[0], double),
+    double *rowsqr = R_Calloc(Zdims[0], double),
 	**st = Alloca(nt, double*),
 	*zx = REAL(R_do_slot(Zt, install("x")));
     R_CheckStack();
@@ -1068,7 +1068,7 @@ SEXP mer_ST_initialize(SEXP ST, SEXP Gpp, SEXP Zt)
 	    *stij = sqrt(nlev[i]/(0.375 * *stij));
 	}
     }
-    Free(rowsqr);
+    R_Free(rowsqr);
     return R_NilValue;
 }
 
@@ -1120,7 +1120,7 @@ SEXP mer_postVar(SEXP x, SEXP which)
     CHM_SP sm1, sm2;
     CHM_DN dm1;
     CHM_FR L = L_SLOT(x);
-    int *Perm = (int*)(L->Perm), *iperm = Calloc(q, int),
+    int *Perm = (int*)(L->Perm), *iperm = R_Calloc(q, int),
 	*nc = Alloca(nt, int), *nlev = Alloca(nt, int);
     double **st = Alloca(nt, double*);
     R_CheckStack();
@@ -1175,7 +1175,7 @@ SEXP mer_postVar(SEXP x, SEXP which)
 	    M_cholmod_free_sparse(&rhs, &c);
 	}
     }
-    Free(iperm);
+    R_Free(iperm);
     UNPROTECT(1);
     return ans;
 }
@@ -1206,13 +1206,13 @@ static void lmm_update_projection(SEXP x, double *pb, double *pbeta)
     CHM_DN cpb = N_AS_CHM_DN(pb, q, 1), sol;
     R_CheckStack();
 
-    wy = Calloc(n, double);
+    wy = R_Calloc(n, double);
     for (int i = 0; i < n; i++) wy[i] = y[i] - (off ? off[i] : 0);
     if (sXwt) {		     /* Replace X by weighted X and weight wy */
 	if (!cx) error(_("Cx slot has zero length when sXwt does not."));
 
 	A->x = (void*)cx;
-	WX = Calloc(n * p, double);
+	WX = R_Calloc(n * p, double);
 
 	for (int i = 0; i < n; i++) {
 	    wy[i] *= sXwt[i];
@@ -1236,8 +1236,8 @@ static void lmm_update_projection(SEXP x, double *pb, double *pbeta)
 	- (sqr_length(pbeta, p) + sqr_length(pb, q));
     if (d[pwrss_POS] < 0)
 	error(_("Calculated PWRSS for a LMM is negative"));
-    Free(wy);
-    if (WX) Free(WX);
+    R_Free(wy);
+    if (WX) R_Free(WX);
 }
 
 

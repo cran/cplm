@@ -93,7 +93,7 @@ int metrop_tnorm_rw(double m, double sd, double lb, double rb, double *sn,
  */
 static void rmvnorm(int d, double *m, double *v, double *s){
   int incx = 1;
-  double *lv = Calloc(d * d, double) ;
+  double *lv = R_Calloc(d * d, double) ;
   /* simulate d univariate normal r.v.s */
   for (int i = 0; i < d; i++)  s[i] = rnorm(0, 1) ;    
   /* cholesky factor of v */
@@ -101,7 +101,7 @@ static void rmvnorm(int d, double *m, double *v, double *s){
   /* scale and shift univariate normal r.v.s */
   F77_CALL(dtrmv)("L", "N", "N", &d, lv, &d, s, &incx FCONE FCONE FCONE) ;
   for (int i = 0; i < d; i++)  s[i] += m[i] ;    
-  Free(lv) ;    
+  R_Free(lv) ;    
 }
 
 /**
@@ -115,14 +115,14 @@ static void rmvnorm(int d, double *m, double *v, double *s){
  * @return exponent of MVN
  */
 double dmvnorm(int d, double *x, double *m, double *iv){
-  double ep = 0.0, *dx = Calloc(d, double), *tmp = Calloc(d, double) ;
+  double ep = 0.0, *dx = R_Calloc(d, double), *tmp = R_Calloc(d, double) ;
   for (int i = 0; i < d; i++)
     dx[i] = m ? (x[i] - m[i]) : x[i];
   mult_mv("N", d, d, iv, dx, tmp) ;
   for (int i = 0; i < d; i++)
     ep += dx[i] * tmp[i] ;
   ep *= -0.5 ;
-  Free(dx); Free(tmp);
+  R_Free(dx); R_Free(tmp);
   return ep ;
 }
 

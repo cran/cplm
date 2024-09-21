@@ -47,9 +47,9 @@ double var(double *x, int n){
  *
  */
 void cov(int n, int p, double *x, double *ans){
-  double *one = Calloc(n * n, double),
-    *x2 = Calloc(n * p, double),
-    *x3 = Calloc(n * p, double);
+  double *one = R_Calloc(n * n, double),
+    *x2 = R_Calloc(n * p, double),
+    *x3 = R_Calloc(n * p, double);
   double alpha = -1.0 / n, beta = 1.0, beta2 = 0.0;
 
   // subtract mean    
@@ -65,9 +65,9 @@ void cov(int n, int p, double *x, double *ans){
   F77_CALL(dgemm)("T", "N", &p, &p, &n, &beta, x2,
 		  &n, x3, &n, &beta2, ans, &p FCONE FCONE);
   for (int i = 0; i < p * p; i++) ans[i] /= (n - 1) * 1.0 ;
-  Free(one) ;
-  Free(x2) ;
-  Free(x3) ;
+  R_Free(one) ;
+  R_Free(x2) ;
+  R_Free(x3) ;
 }
 
 /************************************************************/
@@ -106,11 +106,11 @@ void mult_mv(char *trans, int m, int n, double *A,
  */
 
 void mult_xtx(int m, int n, double *x, double *out){
-  double alpha = 1.0, beta = 0.0, *x2 = Calloc(m * n, double);
+  double alpha = 1.0, beta = 0.0, *x2 = R_Calloc(m * n, double);
   Memcpy(x2, x, m * n) ;
   F77_CALL(dgemm)("T", "N", &n, &n, &m, &alpha, x2, &m,
 		  x, &m, &beta, out, &n FCONE FCONE) ;
-  Free(x2) ;
+  R_Free(x2) ;
 }
 
 /**
@@ -194,8 +194,8 @@ void grad(int n, double *x,  double (*myfunc)(double *x, void *data),
  */
 void hess(int n, double *x, double (*myfunc)(double *x, void *data), 
           void *data, double *ans){
-  double *y1 = Calloc(n, double),
-    *y2 = Calloc(n, double)  ;
+  double *y1 = R_Calloc(n, double),
+    *y2 = R_Calloc(n, double)  ;
   for (int i = 0; i < n; i++){
     x[i] += DIFF_EPS ;
     grad(n, x, myfunc, data, y1) ;
@@ -205,7 +205,7 @@ void hess(int n, double *x, double (*myfunc)(double *x, void *data),
       ans[j + i * n] = (y1[j] - y2[j]) / DIFF_EPS * 0.5 ;
     x[i] += DIFF_EPS ;
   }
-  Free(y1) ; Free(y2) ;
+  R_Free(y1) ; R_Free(y2) ;
 }
 
 
@@ -260,8 +260,8 @@ void rwishart(int d, double nu, double *scal, double *out)
     double *scCp, *tmp, one = 1, zero = 0;
 
     psqr = d*d;
-    tmp = Calloc(psqr, double);
-    scCp = Calloc(psqr, double);
+    tmp = R_Calloc(psqr, double);
+    scCp = R_Calloc(psqr, double);
 
     Memcpy(scCp, scal, psqr);
     AZERO(tmp, psqr);
@@ -279,6 +279,6 @@ void rwishart(int d, double nu, double *scal, double *out)
             out[i + k * d] = out[k + i * d];
     }
     PutRNGstate();
-    Free(tmp) ;
-    Free(scCp) ;
+    R_Free(tmp) ;
+    R_Free(scCp) ;
 }

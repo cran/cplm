@@ -60,8 +60,8 @@ void dtweedie(int n, double *y, double *mu, double phi, double p,
     return ;
   }
   /* only need the lower bound and the # terms to be stored */
-  int jh, *jl = Calloc(np, int), *jd = Calloc(np, int); 
-  double *jmax = Calloc(np, double), *logz = Calloc(np, double);
+  int jh, *jl = R_Calloc(np, int), *jd = R_Calloc(np, int); 
+  double *jmax = R_Calloc(np, double), *logz = R_Calloc(np, double);
 
   /* compute jmax for each y > 0*/
   cc = a * log(p1) - log(p2);
@@ -99,7 +99,7 @@ void dtweedie(int n, double *y, double *mu, double phi, double p,
 
   /* set limit for # terms in the sum */
   int nterms = imin2(imax(jd, np), TWEEDIE_NTERM), iterm ;
-  double *ww = Calloc(nterms, double) ;
+  double *ww = R_Calloc(nterms, double) ;
   /* evaluate series using the finite sum*/
   pos = 0;  
   for (int i = 0; i < n; i++){    
@@ -122,11 +122,11 @@ void dtweedie(int n, double *y, double *mu, double phi, double p,
           pos++;
       }
   }
-  Free(jmax); 
-  Free(logz);
-  Free(jl); 
-  Free(jd);
-  Free(ww);
+  R_Free(jmax); 
+  R_Free(logz);
+  R_Free(jl); 
+  R_Free(jd);
+  R_Free(ww);
 }
 
 /**
@@ -145,10 +145,10 @@ void dtweedie(int n, double *y, double *mu, double phi, double p,
 
 double dl2tweedie(int n, double *y, double *mu, double phi, double p,
                   double *wts){
-  double *ansv = Calloc(n, double);
+  double *ansv = R_Calloc(n, double);
   dtweedie(n, y, mu, phi, p, wts, ansv);
   double ans = -2 * dcumsum(ansv, n);
-  Free(ansv);
+  R_Free(ansv);
   return ans ;
 }
 
